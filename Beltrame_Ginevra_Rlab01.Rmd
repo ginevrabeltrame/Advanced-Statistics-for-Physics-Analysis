@@ -1,0 +1,234 @@
+---
+title: "Beltrame_Ginevra_Rlab01"
+output: html_document
+date: "2024-04-10"
+---
+
+# Rlab - Exercise 01
+
+## 1) read the data and import in a data.frame or tibble structure
+
+```{r}
+data02 <- read.csv("C:/Users/Ginevra Beltrame/Desktop/Physics of Data/Advanced Statistics for Physics Analysis/Rlab01/JC-201902-citibike-tripdata.csv")
+data03 <- read.csv("C:/Users/Ginevra Beltrame/Desktop/Physics of Data/Advanced Statistics for Physics Analysis/Rlab01/JC-201903-citibike-tripdata.csv")
+data04 <- read.csv("C:/Users/Ginevra Beltrame/Desktop/Physics of Data/Advanced Statistics for Physics Analysis/Rlab01/JC-201904-citibike-tripdata.csv")
+data05 <- read.csv("C:/Users/Ginevra Beltrame/Desktop/Physics of Data/Advanced Statistics for Physics Analysis/Rlab01/JC-201905-citibike-tripdata.csv")
+data06 <- read.csv("C:/Users/Ginevra Beltrame/Desktop/Physics of Data/Advanced Statistics for Physics Analysis/Rlab01/JC-201906-citibike-tripdata.csv")
+```
+
+## 2) merge the five data frames in an unique structure
+
+```{r}
+data_tot <- rbind(data02, data03, data04, data05, data06)
+```
+
+## 3) check for missing data and remove it, if any
+
+```{r}
+na_rows <- is.na(data_tot)
+print(na_rows[! TRUE]) # returns logical(0), there are no NA values in DataFrame
+
+data_clean <- na.omit(data_tot)
+```
+
+## 4.1) compute the average and the median trip duration in minutes
+
+```{r}
+mean_duration <- mean(data_clean$tripduration)
+median_duration <- median(data_clean$tripduration)
+print(paste('The average duration of the trip is', as.character(round(mean_duration/60, digits = 2)), 'minutes, while the median is', as.character(round(median_duration/60, digits = 2)), 'minutes.'))
+```
+
+## 4.2) evaluate the minimum and maximum trip duration; does that sound like a reasonable value?
+
+```{r}
+min_duration <- min(data_clean$tripduration)
+max_duration <- max(data_clean$tripduration)
+print(paste('The min duration of a trip is', as.character(round(min_duration/60, digits = 2)), 'minutes, while the max is', as.character(round(max_duration/60, digits = 2)), 'minutes.'))
+print(paste('While the minimum value sounds reasonable, the max does not, as it is of', as.character(round(max_duration/(60*60*24), digits = 0)), 'days.'))
+```
+
+## 4.3) repeat the calculation of the average (and the median) trip duration by excluding trips longer than 3 hours. Next, evaluate the number of skimmed entries
+
+```{r}
+threshold_3h <- 3*60*60
+data_under_3h <- data_clean[data_clean$tripduration < threshold_3h, ] #use filter, select, transmutate...
+mean_duration <- mean(data_under_3h$tripduration)
+median_duration <- median(data_under_3h$tripduration)
+print(paste('Discarding all trips above 3h, the average duration of a trip is', as.character(round(mean_duration/60, digits = 2)), 'minutes, while the median is', as.character(round(median_duration/60, digits = 2)), 'minutes.'))
+skimmed_entries <- nrow(data_clean) - nrow(data_under_3h)
+print(paste('The number of skimmed entries is', as.character(skimmed_entries)))
+```
+
+## 4.4) plot the distribution of trip duration after the skimming of the previous point
+
+```{r}
+hist(data_under_3h$tripduration/60, xlab='Duration (min)', ylab='Counts', main='Distribution of trip duration', xlim=c(0,180), xaxt='n', col='green', breaks=180*3/4)
+axis(side = 1, at = seq(0, 180, by = 30), labels = TRUE)
+```
+
+## 5) plot the monthly average trip duration
+
+```{r, echo=FALSE}
+library(lubridate)
+
+avg02 <- mean(data_clean$tripduration[month(as.POSIXct(data_clean$starttime)) == 2])/60
+avg03 <- mean(data_clean$tripduration[month(as.POSIXct(data_clean$starttime)) == 3])/60
+avg04 <- mean(data_clean$tripduration[month(as.POSIXct(data_clean$starttime)) == 4])/60
+avg05 <- mean(data_clean$tripduration[month(as.POSIXct(data_clean$starttime)) == 5])/60
+avg06 <- mean(data_clean$tripduration[month(as.POSIXct(data_clean$starttime)) == 6])/60
+
+avgs <- c(avg02, avg03, avg04, avg05, avg06)
+```
+
+```{r}
+plot(c(2,3,4,5,6), avgs, xlab='Month', xaxt='n', ylab='Average of trip duration (min)', yaxt='n', pch=19, col='blue', main='Monthly average trip duration')
+axis(side = 1, at = c(2,3,4,5,6), labels = c('Feb', 'Mar', 'Apr', 'May', 'Jun'))
+axis(side = 2, at = seq(9,16,1), labels = seq(9,16,1))
+```
+
+## 6.1) plot the number of rides per day
+
+```{r}
+data_clean$day <- format(as.POSIXct(data_clean$starttime), "%d-%m")
+
+plot(table(data_clean$day), xlab='Day', ylab='Number of rides', main='Number of rides per day')
+```
+
+## 6.2) plot the hourly distribution on weekdays and on weekends
+
+```{r, echo=FALSE, fig.width=6, fig.height=10}
+library(dplyr)
+
+data_clean$hour <- hour(as.POSIXct(sub("\\..*", "", data_clean$starttime), format="%Y-%m-%d %H:%M:%S"))
+
+data_clean$is_weekend <- FALSE
+weeks <- 21
+day_multiples <- cumsum(c(1, 1, rep(c(6,1), times = weeks)))
+
+# define the DataFrame of entries for the first day of the collection, then create a for cycle to find all weekends, doing +1 and +6
+counter <- 0
+for (dm in day_multiples) {
+  data_clean$is_weekend[as.POSIXct(sub("\\..*", "", data_clean$starttime), format="%Y-%m-%d") == as.POSIXct(sub("\\..*", "", data_clean$starttime[1]), format="%Y-%m-%d") + dm*days(1)] <- TRUE
+  counter <- counter + 1
+  print(paste('Computing:', as.character(counter), '/ 44'))
+}
+
+weekends_table = table(data_clean$hour[data_clean$is_weekend == TRUE])
+weekdays_table = table(data_clean$hour[data_clean$is_weekend == FALSE])
+
+par(mfrow=c(2,1))
+plot(weekdays_table, xlab='Hour', ylab='Number of rides', main='Number of rides per hour, weekends')
+plot(weekends_table, xlab='Hour', ylab='Number of rides', main='Number of rides per hour, weekdays')
+par(mfrow=c(1,1))
+
+```
+
+## 6.3) plot again the average hourly distribution on weekdays but separating customer and subscriber users
+
+```{r, echo=FALSE, fig.width=6, fig.height=10}
+weekdays_data <- data_clean[data_clean$is_weekend == FALSE,]
+
+subscriber_table <- table(weekdays_data$hour[weekdays_data$usertype == 'Subscriber'])
+customer_table <- table(weekdays_data$hour[weekdays_data$usertype == 'Customer'])
+
+par(mfrow=c(2,1))
+plot(subscriber_table, xlab='Hour', ylab='Number of rides', main='Number of rides per hour, weekdays, subscribers')
+plot(customer_table, xlab='Hour', ylab='Number of rides', main='Number of rides per hour, weekdays, customers')
+par(mfrow=c(1,1))
+```
+
+## 7.1) using the latitude and longitude information, evaluate the average speed (in km/h) of a user, discarding the trips lasting longer than 1 hour
+
+```{r}
+threshold_1h <- 60*60
+data_under_1h <- data_clean[data_clean$tripduration < threshold_1h, ]
+
+km_per_degree <- 111.32
+data_under_1h$speed <- sqrt(((data_under_1h$end.station.latitude - data_under_1h$start.station.latitude)*km_per_degree)^2 + ((data_under_1h$end.station.longitude - data_under_1h$start.station.longitude)*km_per_degree)^2)/(data_under_1h$tripduration/(60*60))
+
+print(data_under_1h)
+```
+
+## 7.2) plot the average speed as a function of route length for the following group of distances d \< 500 m, 500 m \< d \< 1000 m, 1000 m \< d \< 2000 m, 2000 m \< d \< 3000 m, d \> 3000 m and discarding trips longer than 1 hour
+
+```{r, echo=FALSE, fig.width=6, fig.height=10}
+data_under_1h$distance <- sqrt(((data_under_1h$end.station.latitude - data_under_1h$start.station.latitude)*km_per_degree)^2 + ((data_under_1h$end.station.longitude - data_under_1h$start.station.longitude)*km_per_degree)^2)
+
+data_under500 <- data_under_1h[0.0 < data_under_1h$distance & data_under_1h$distance < 0.5, c('distance', 'speed', 'is_weekend')]
+data_under1000 <- data_under_1h[0.5 < data_under_1h$distance & data_under_1h$distance < 1, c('distance', 'speed', 'is_weekend')]
+data_under2000 <- data_under_1h[1 < data_under_1h$distance & data_under_1h$distance < 2, c('distance', 'speed', 'is_weekend')]
+data_under3000 <- data_under_1h[2 < data_under_1h$distance & data_under_1h$distance < 3, c('distance', 'speed', 'is_weekend')]
+data_over3000 <- data_under_1h[3 < data_under_1h$distance, c('distance', 'speed', 'is_weekend')]
+
+par(mfrow = c(3,2))
+
+plot(data_under500$distance, data_under500$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='d < 500m', col='red')
+plot(data_under1000$distance, data_under1000$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='500 m < d < 1000m', col='blue')
+plot(data_under2000$distance, data_under2000$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='1000 m < d < 2000m', col='green')
+plot(data_under3000$distance, data_under3000$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='2000 m < d < 3000m', col='orange')
+plot(data_over3000$distance, data_over3000$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='3000 m < d', col='purple')
+plot(data_under_1h$distance, data_under_1h$speed, type='p', pch=20, xlab='Route length', ylab='Average speed', main='All data', col='black')
+
+par(mfrow = c(1,1))
+```
+
+## 7.3) repeat the same graph, but show the results obtained separately for weekdays and weekends
+
+```{r, fig.width=6, fig.height=15}
+par(mfrow = c(6,2))
+
+plot(data_under500$distance[data_under500$is_weekend == TRUE], data_under500$speed[data_under500$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='d < 500m, weekend', col='red')
+plot(data_under500$distance[data_under500$is_weekend == FALSE], data_under500$speed[data_under500$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='d < 500m, weekday', col='brown')
+
+plot(data_under1000$distance[data_under1000$is_weekend == TRUE], data_under1000$speed[data_under1000$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='500 m < d < 1000m, weekend', col='blue')
+plot(data_under1000$distance[data_under1000$is_weekend == FALSE], data_under1000$speed[data_under1000$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='500 m < d < 1000m, weekday', col='blue4')
+
+plot(data_under2000$distance[data_under2000$is_weekend == TRUE], data_under2000$speed[data_under2000$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='1000 m < d < 2000m, weekend', col='green')
+plot(data_under2000$distance[data_under2000$is_weekend == FALSE], data_under2000$speed[data_under2000$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='1000 m < d < 2000m, weekday', col='green4')
+
+plot(data_under3000$distance[data_under3000$is_weekend == TRUE], data_under3000$speed[data_under3000$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='2000 m < d < 3000m, weekend', col='orange')
+plot(data_under3000$distance[data_under3000$is_weekend == FALSE], data_under3000$speed[data_under3000$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='2000 m < d < 3000m, weekday', col='goldenrod4')
+
+plot(data_over3000$distance[data_over3000$is_weekend == TRUE], data_over3000$speed[data_over3000$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='3000 m < d, weekend', col='purple')
+plot(data_over3000$distance[data_over3000$is_weekend == FALSE], data_over3000$speed[data_over3000$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='3000 m < d, weekday', col='darkorchid4')
+
+plot(data_under_1h$distance[data_under_1h$is_weekend == TRUE], data_under_1h$speed[data_under_1h$is_weekend == TRUE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='All data, weekend', col='gray')
+plot(data_under_1h$distance[data_under_1h$is_weekend == FALSE], data_under_1h$speed[data_under_1h$is_weekend == FALSE], type='p', pch=20, xlab='Route length', ylab='Average speed', main='All data, weekday', col='black')
+```
+
+## 8.1) find the most common start station and the least popular end station
+
+```{r, echo=FALSE, fig.width=6, fig.height=10}
+start_table <- table(data_clean$start.station.name)
+end_table <- table(data_clean$end.station.name)
+
+par(mfrow = c(2,1))
+plot(start_table, xlab='Start station name', ylab='Counts')
+plot(end_table, xlab='End station name', ylab='Counts')
+par(mfrow = c(1,1))
+
+print(paste('The most common start station is', names(start_table)[which.max(as.vector(start_table))], 'with', max(as.vector(start_table)), 'counts.'))
+print(paste('The least common end station is', names(end_table)[which.min(as.vector(end_table))], 'with', min(as.vector(end_table)), 'counts.'))
+
+```
+
+## 8.2) show the distribution of start stations
+
+```{r}
+plot(start_table, xlab='Start station name', ylab='Counts')
+```
+
+## 8.3) find the three most common routes (start and end station) and the three least popular ones
+
+```{r}
+data_clean$route <- paste(data_clean$start.station.name, '-', data_clean$end.station.name)
+routes_table <- table(data_clean$route)
+
+print(paste('Least common route: "', names(routes_table)[order(as.vector(routes_table))[1]], '" with counts', as.vector(routes_table)[order(as.vector(routes_table))[1]]))
+print(paste('Second least common route: "', names(routes_table)[order(as.vector(routes_table))[2]], '" with counts', as.vector(routes_table)[order(as.vector(routes_table))[2]]))
+print(paste('Third least common route: "', names(routes_table)[order(as.vector(routes_table))[3]], 'with counts', as.vector(routes_table)[order(as.vector(routes_table))[3]]))
+print(paste('Most common route:', names(routes_table)[order(as.vector(routes_table))[length(routes_table)]], 'with counts', as.vector(routes_table)[order(as.vector(routes_table))[length(routes_table)]]))
+print(paste('Second most common route:', names(routes_table)[order(as.vector(routes_table))[length(routes_table)-1]], 'with counts', as.vector(routes_table)[order(as.vector(routes_table))[length(routes_table)-1]]))
+print(paste('Third most common route:', names(routes_table)[order(as.vector(routes_table))[length(routes_table)-2]], 'with counts', as.vector(routes_table)[order(as.vector(routes_table))[length(routes_table)-2]]))
+```

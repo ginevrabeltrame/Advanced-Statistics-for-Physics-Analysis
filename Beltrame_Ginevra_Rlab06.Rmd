@@ -1,0 +1,768 @@
+---
+title: "Beltrame_Ginevra_Rlab06"
+output: html_document
+date: "2024-06-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1
+
+Ladislaus Josephovich Bortkiewicz was a Russian economist and statistician. He noted that the Poisson distribution can be very useful in applied statistics when describing low-frequency events in a large population. In a famous example he showed that the number of deaths by horse kick among the Prussian army follows the Poisson distribution.
+
+Considering the following two sets of observations taken over a fixed large time interval in two different corps:
+
+```         
+| y death soldiers  |   0   |   1   |   2   |   3   |   4   |  ≥5   |
+|-------------------|-------|-------|-------|-------|-------|-------|
+| n1 observations   |  109  |  65   |  22   |   3   |   1   |   0   |
+| n2 observations   |  144  |  91   |  32   |  11   |   2   |   0   |
+```
+
+(a) Assuming a uniform prior, compute and plot the posterior distribution for $λ$, the death rate over the measurement time. Determine the posterior mean, median and variance, and compute the 95% credibility interval.
+(b) Assuming now a Jeffrey's prior, $g(λ) ∝ \frac{1}{\sqrt{\lambda}}$ with $λ > 0$, compute and plot the posterior distribution for $λ$, the death rate over the measurement time. Determine the posterior mean, median and variance, and compute the 95% credibility interval.
+
+### Solution
+
+#### (a) Uniform prior
+
+From a theoretical point of view, the Posterior distribution of a Poisson process, assuming a Uniform prior, takes the shape of a $Gamma(\alpha, \beta)$ distribution, with $\alpha = \sum_{j=1}^{N} y_j \cdot n_j + 1$ and $\beta = \sum_{j=1}^{N} n_j$, where $\{n_{1,j}\}_{j=1...N} = \{109, 65, 22, 3, 1, 0\}$ and $\{n_{2,j}\}_{j=1...N} = \{144, 91, 32, 11, 2, 0\}$. It can therefore be computed
+
+$$
+P_1(\lambda | \{n_{1,j}\}_{j=1...N}) = Gamma(123, 200) \qquad \text{and} \qquad P_2(\lambda | \{n_{2,j}\}_{j=1...N}) = Gamma(197, 280)
+$$
+
+It is now possible to infer the mean, variance and median from the known theoretical results of the Gamma distribution. Specifically,
+
+$$
+E[\lambda] =  \frac{\alpha}{\beta} \qquad \text{and} \qquad Var(\lambda) = \frac{\alpha}{\beta^2} \qquad \text{so respectively,} \\
+E_1[\lambda] = \frac{123}{200} = 0.615  \qquad Var_1(\lambda) = \frac{123}{200^2} \approx 0.003 \qquad \text{and} \qquad E_2[\lambda] = \frac{197}{280} \approx 0.7036  \qquad Var_2(\lambda) = \frac{197}{280^8} \approx 0.0025
+$$
+
+As for the median, no closed-form result is readily available but it can be inferred from a sampling of the probability distribution and from a numerical computation of the quantiles.
+
+```{r, fig.width=10, fig.height=6}
+y <- c(0, 1, 2, 3, 4, 5)
+n1 <- c(109, 65, 22, 3, 1, 0)
+n2 <- c(144, 91, 32, 11, 2, 0)
+
+shape1 <- sum(n1*y) + 1
+rate1 <- sum(n1)
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_gamma <- qgamma(0.5, shape = shape1, rate = rate1)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape1, rate1)
+
+mean_gamma <- mean(samples)
+variance_gamma <- var(samples)
+
+cat('DATASET 1\n')
+cat("Estimated Mean:", mean_gamma, "\n")
+cat("Estimated Variance:", variance_gamma, "\n")
+cat("Estimated Median:", median_gamma, "\n")
+
+shape2 <- sum(y*n2) + 1
+rate2 <- sum(n2)
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_gamma <- qgamma(0.5, shape = shape2, rate = rate2)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape2, rate2)
+
+mean_gamma <- mean(samples)
+variance_gamma <- var(samples)
+
+cat('\nDATASET 2\n')
+cat("Estimated Mean:", mean_gamma, "\n")
+cat("Estimated Variance:", variance_gamma, "\n")
+cat("Estimated Median:", median_gamma, "\n")
+```
+
+The analytic results for the mean and variance are compatible with the numerical ones.
+
+```{r, fig.width=10, fig.height=6}
+library(ggplot2)
+
+cf <- 0.975
+
+x <- seq(0, 1, length.out = 500)
+y1 <- dgamma(x, shape = shape1, rate = rate1)
+data1 <- data.frame(x = x, y = y1, group='dataset 1')
+
+y2 <- dgamma(x, shape = shape2, rate = rate2)
+data2 <- data.frame(x = x, y = y2, group='dataset 2')
+
+data <- rbind(data1, data2)
+
+p <- ggplot(data, aes(x = x, y = y, color = group)) + 
+  geom_line(linewidth=1) + 
+  labs(title = "Posterior distributions", x = "lambda", y = "Density", color='Dataset') + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+cf1 <- qgamma(c(1-cf, cf), shape = shape1, rate = rate1)
+cf2 <- qgamma(c(1-cf, cf), shape = shape2, rate = rate2)
+
+p + 
+  geom_vline(xintercept = cf1[1], linetype = "dashed", color = "red", linewidth = 0.5) +
+  geom_vline(xintercept = cf1[2], linetype = "dashed", color = "red", linewidth = 0.5) +
+  annotate('text', x = cf1[2]-0.01, y = max(y1)*0.8, label = paste("dataset 1 (0.95) :", round(cf1[2], 2)), color = "darkred", size = 3, angle=90) +
+  annotate('text', x = cf1[1]+0.01, y = max(y1)*0.8, label = paste("dataset 1 (0.05) :", round(cf1[1], 2)), color = "darkred", size = 3, angle=90) +
+  geom_vline(xintercept = cf2[1], linetype = "dashed", color = "blue", linewidth = 0.5) +
+  geom_vline(xintercept = cf2[2], linetype = "dashed", color = "blue", linewidth = 0.5) +
+  annotate('text', x = cf2[2]+0.01, y = max(y2)*0.8, label = paste("dataset 2 (0.95) :", round(cf2[2], 2)), color = "darkblue", size = 3, angle=90) +
+  annotate('text', x = cf2[1]-0.01, y = max(y2)*0.8, label = paste("dataset 2 (0.05) :", round(cf2[1], 2)), color = "darkblue", size = 3, angle=90)
+```
+
+#### (b) Jeffrey's prior
+
+From a theoretical point of view, the Posterior distribution of a Poisson process, assuming Jeffrey's prior $Beta(\frac{1}{2}, 0)$, takes the shape of a $Gamma(\alpha, \beta)$ distribution, with $\alpha = \sum_{j=1}^{N} y_j \cdot n_j + \frac{1}{2}$ and $\beta = \sum_{j=1}^{N} n_j$, where $\{n_{1,j}\}_{j=1...N} = \{109, 65, 22, 3, 1, 0\}$ and $\{n_{2,j}\}_{j=1...N} = \{144, 91, 32, 11, 2, 0\}$. It can therefore be computed
+
+$$
+P_1(\lambda | \{n_{1,j}\}_{j=1...N}) = Gamma(122.5, 200) \qquad \text{and} \qquad P_2(\lambda | \{n_{2,j}\}_{j=1...N}) = Gamma(196.5, 280)
+$$
+
+It is now possible to infer the mean, variance and median from the known theoretical results of the Gamma distribution. Specifically,
+
+$$
+E_1[\lambda] = \frac{122.5}{200} \approx 0.6125  \qquad Var_1(\lambda) = \frac{122.5}{200^2} \approx 0.003 \qquad \text{and} \qquad E_2[\lambda] = \frac{196.5}{280} = 0.7018  \qquad Var_2(\lambda) = \frac{196.5}{280^2} \approx 0.0025
+$$
+
+As for the median, no closed-form result is readily available but it can be inferred from a sampling of the probability distribution and from a numerical computation of the quantiles.
+
+```{r, fig.width=10, fig.height=6}
+y <- c(0, 1, 2, 3, 4, 5)
+n1 <- c(109, 65, 22, 3, 1, 0)
+n2 <- c(144, 91, 32, 11, 2, 0)
+
+shape1 <- sum(n1*y) + 0.5
+rate1 <- sum(n1)
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_gamma <- qgamma(0.5, shape = shape1, rate = rate1)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape1, rate1)
+
+mean_gamma <- mean(samples)
+variance_gamma <- var(samples)
+
+cat('DATASET 1\n')
+cat("Estimated Mean:", mean_gamma, "\n")
+cat("Estimated Variance:", variance_gamma, "\n")
+cat("Estimated Median:", median_gamma, "\n")
+
+shape2 <- sum(n2*y) + 0.5
+rate2 <- sum(n2)
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_gamma <- qgamma(0.5, shape = shape2, rate = rate2)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape2, rate2)
+
+mean_gamma <- mean(samples)
+variance_gamma <- var(samples)
+
+cat('\nDATASET 2\n')
+cat("Estimated Mean:", mean_gamma, "\n")
+cat("Estimated Variance:", variance_gamma, "\n")
+cat("Estimated Median:", median_gamma, "\n")
+```
+
+The analytic results for the mean and variance are compatible with the numerical ones.
+
+```{r, fig.width=10, fig.height=6}
+library(ggplot2)
+
+cf <- 0.975
+
+x <- seq(0, 1, length.out = 500)
+y1 <- dgamma(x, shape = shape1, rate = rate1)
+data1 <- data.frame(x = x, y = y1, group='dataset 1')
+
+y2 <- dgamma(x, shape = shape2, rate = rate2)
+data2 <- data.frame(x = x, y = y2, group='dataset 2')
+
+data <- rbind(data1, data2)
+
+p <- ggplot(data, aes(x = x, y = y, color = group)) + 
+  geom_line(linewidth=1) + 
+  labs(title = "Posterior distributions", x = "lambda", y = "Density", color='Dataset') + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+cf1 <- qgamma(c(1-cf, cf), shape = shape1, rate = rate1)
+cf2 <- qgamma(c(1-cf, cf), shape = shape2, rate = rate2)
+
+p + 
+  geom_vline(xintercept = cf1[1], linetype = "dashed", color = "red", linewidth = 0.5) +
+  geom_vline(xintercept = cf1[2], linetype = "dashed", color = "red", linewidth = 0.5) +
+  annotate('text', x = cf1[2]-0.01, y = max(y1)*0.8, label = paste("dataset 1 (0.95) :", round(cf1[2], 2)), color = "darkred", size = 3, angle=90) +
+  annotate('text', x = cf1[1]+0.01, y = max(y1)*0.8, label = paste("dataset 1 (0.05) :", round(cf1[1], 2)), color = "darkred", size = 3, angle=90) +
+  geom_vline(xintercept = cf2[1], linetype = "dashed", color = "blue", linewidth = 0.5) +
+  geom_vline(xintercept = cf2[2], linetype = "dashed", color = "blue", linewidth = 0.5) +
+  annotate('text', x = cf2[2]+0.01, y = max(y2)*0.8, label = paste("dataset 2 (0.95) :", round(cf2[2], 2)), color = "darkblue", size = 3, angle=90) +
+  annotate('text', x = cf2[1]-0.01, y = max(y2)*0.8, label = paste("dataset 2 (0.05) :", round(cf2[1], 2)), color = "darkblue", size = 3, angle=90)
+```
+
+## Exercise 2
+
+Solve Exercise 1 using a Markov Chain Monte Carlo using stan.
+
+### Solution
+
+```{r}
+library(rstan)
+options(mc.cores=parallel::detectCores())
+# on my machine:
+parallel::detectCores()
+rstan_options(auto_write = TRUE)
+
+y <- c(0, 1, 2, 3, 4, 5)
+n1 <- c(109, 65, 22, 3, 1, 0)
+n2 <- c(144, 91, 32, 11, 2, 0)
+```
+
+#### (a) Uniform prior
+
+```{r}
+x <- c(rep(y[1], n1[1]), rep(y[2], n1[2]), rep(y[3], n1[3]), rep(y[4], n1[4]), rep(y[5], n1[5]), rep(y[6], n1[6]))
+
+dataList <- list(Y = x, N = length(x))
+
+modelString = "
+  data {
+    int<lower=0> N;
+    int Y[N];
+  }
+  parameters {
+    real<lower=0> lambda;
+  }
+  model {
+    lambda ~ uniform(0,1000);
+    Y ~ poisson(lambda);
+  }
+"
+writeLines(modelString, con="stan_Poisson_model_Uniform.stan")
+
+stanDso <- stan_model(model_code=modelString)
+n_chains <- 3
+# initialization with the mean value of lambda estimated in Exercise 1
+initializers_list <- replicate(n_chains, list(lambda = 0.6), simplify = FALSE) 
+
+stanFit <- sampling(
+  object = stanDso,
+  data = dataList,
+  chains = n_chains,
+  iter = 1000, 
+  warmup = 200,
+  thin = 1,
+  init = initializers_list
+  )
+
+
+library(coda)
+mcmcCoda <- mcmc.list(lapply(1:ncol(stanFit), function(lambda) {mcmc(as.array(stanFit)[, lambda,])} ))
+summary(mcmcCoda)
+
+plot(mcmcCoda[, 'lambda'], main='Trace and density of lambda')
+
+my.lags = seq(0,500,10)
+y1 <- autocorr(mcmcCoda, lags=my.lags)
+colors <- c('red', 'blue', 'darkgreen', 'orange', 'violet')
+
+plot(my.lags, my.lags, ylim=c(-0.1,1.1), xlab='lag', ylab='ACF', col='white')
+for (i in 1:n_chains){
+  lines(my.lags, y1[[i]][, ,'lambda'][,'lambda'], col=colors[i], lwd=2)
+}
+
+legend("topright", legend=c('chain 1', 'chain 2', 'chain 3', 'chain 4', 'chain 5')[1:n_chains], col=colors, lty=1, lwd = 2)
+
+```
+
+```{r}
+x <- c(rep(y[1], n2[1]), rep(y[2], n2[2]), rep(y[3], n2[3]), rep(y[4], n2[4]), rep(y[5], n2[5]), rep(y[6], n2[6]))
+
+dataList <- list(Y = x, N = length(x))
+
+modelString = "
+  data {
+    int<lower=0> N;
+    int Y[N];
+  }
+  parameters {
+    real<lower=0> lambda;
+  }
+  model {
+    lambda ~ uniform(0,1000);
+    Y ~ poisson(lambda);
+  }
+"
+writeLines(modelString, con="stan_Poisson_model_Uniform.stan")
+
+stanDso <- stan_model(model_code=modelString)
+n_chains <- 3
+# initialization with the mean value of lambda estimated in Exercise 1
+initializers_list <- replicate(n_chains, list(lambda = 0.7), simplify = FALSE) 
+
+stanFit <- sampling(
+  object = stanDso,
+  data = dataList,
+  chains = n_chains,
+  iter = 1000, 
+  warmup = 200,
+  thin = 1,
+  init = initializers_list
+  )
+
+
+library(coda)
+mcmcCoda <- mcmc.list(lapply(1:ncol(stanFit), function(lambda) {mcmc(as.array(stanFit)[, lambda,])} ))
+summary(mcmcCoda)
+
+plot(mcmcCoda[, 'lambda'], main='Trace and density of lambda')
+
+my.lags = seq(0,500,10)
+y1 <- autocorr(mcmcCoda, lags=my.lags)
+colors <- c('red', 'blue', 'darkgreen', 'orange', 'violet')
+
+plot(my.lags, my.lags, ylim=c(-0.1,1.1), xlab='lag', ylab='ACF', col='white')
+for (i in 1:n_chains){
+  lines(my.lags, y1[[i]][, ,'lambda'][,'lambda'], col=colors[i], lwd=2)
+}
+
+legend("topright", legend=c('chain 1', 'chain 2', 'chain 3', 'chain 4', 'chain 5')[1:n_chains], col=colors, lty=1, lwd = 2)
+
+```
+
+#### (b) Jeffrey's prior
+
+```{r}
+x <- c(rep(y[1], n1[1]), rep(y[2], n1[2]), rep(y[3], n1[3]), rep(y[4], n1[4]), rep(y[5], n1[5]), rep(y[6], n1[6]))
+
+dataList <- list(Y = x, N = length(x))
+
+modelString = "
+  data {
+    int<lower=0> N;
+    int Y[N];
+  }
+  parameters {
+    real<lower=0> lambda;
+  }
+  model {
+    lambda ~ gamma(0.5, 0.0001);
+    Y ~ poisson(lambda);
+  }
+"
+writeLines(modelString, con="stan_Poisson_model_Jeffreys.stan")
+
+stanDso <- stan_model(model_code=modelString)
+n_chains <- 3
+# initialization with the mean value of lambda estimated in Exercise 1
+initializers_list <- replicate(n_chains, list(lambda = 0.6), simplify = FALSE)
+
+stanFit <- sampling(
+  object = stanDso,
+  data = dataList,
+  chains = n_chains,
+  iter = 1000, 
+  warmup = 200,
+  thin = 1,
+  init = initializers_list
+  )
+
+
+library(coda)
+mcmcCoda <- mcmc.list(lapply(1:ncol(stanFit), function(lambda) {mcmc(as.array(stanFit)[, lambda,])} ))
+summary(mcmcCoda)
+
+plot(mcmcCoda[, 'lambda'], main='Trace and density of lambda')
+
+my.lags = seq(0,500,10)
+y1 <- autocorr(mcmcCoda, lags=my.lags)
+colors <- c('red', 'blue', 'darkgreen', 'orange', 'violet')
+
+plot(my.lags, my.lags, ylim=c(-0.4,1.1), xlab='lag', ylab='ACF', col='white')
+for (i in 1:n_chains){
+  lines(my.lags, y1[[i]][, ,'lambda'][,'lambda'], col=colors[i], lwd=2)
+}
+
+legend("topright", legend=c('chain 1', 'chain 2', 'chain 3', 'chain 4', 'chain 5')[1:n_chains], col=colors, lty=1, lwd = 2)
+
+```
+
+```{r}
+x <- c(rep(y[1], n2[1]), rep(y[2], n2[2]), rep(y[3], n2[3]), rep(y[4], n2[4]), rep(y[5], n2[5]), rep(y[6], n2[6]))
+
+dataList <- list(Y = x, N = length(x))
+
+modelString = "
+  data {
+    int<lower=0> N;
+    int Y[N];
+  }
+  parameters {
+    real<lower=0> lambda;
+  }
+  model {
+    lambda ~ gamma(0.5, 0.0001);
+    Y ~ poisson(lambda);
+  }
+"
+writeLines(modelString, con="stan_Poisson_model_Jeffreys.stan")
+
+stanDso <- stan_model(model_code=modelString)
+n_chains <- 3
+# initialization with the mean value of lambda estimated in Exercise 1
+initializers_list <- replicate(n_chains, list(lambda = 0.7), simplify = FALSE)
+
+stanFit <- sampling(
+  object = stanDso,
+  data = dataList,
+  chains = n_chains,
+  iter = 1000, 
+  warmup = 200,
+  thin = 1,
+  init = initializers_list
+  )
+
+
+library(coda)
+mcmcCoda <- mcmc.list(lapply(1:ncol(stanFit), function(lambda) {mcmc(as.array(stanFit)[, lambda,])} ))
+summary(mcmcCoda)
+
+plot(mcmcCoda[, 'lambda'], main='Trace and density of lambda')
+
+my.lags = seq(0,500,10)
+y1 <- autocorr(mcmcCoda, lags=my.lags)
+colors <- c('red', 'blue', 'darkgreen', 'orange', 'violet')
+
+plot(my.lags, my.lags, ylim=c(-0.4,1.1), xlab='lag', ylab='ACF', col='white')
+for (i in 1:n_chains){
+  lines(my.lags, y1[[i]][, ,'lambda'][,'lambda'], col=colors[i], lwd=2)
+}
+
+legend("topright", legend=c('chain 1', 'chain 2', 'chain 3', 'chain 4', 'chain 5')[1:n_chains], col=colors, lty=1, lwd = 2)
+
+```
+
+## Exercise 3
+
+A study on water quality of streams, a high level of bacter X was defined as a level greater than 100 per 100 ml of stream water. $n = 116$ samples were taken from streams having a high environmental impact on pandas. Out of these, $y = 11$ had a high bacter X level.
+
+Indicating with $p$ the probability that a sample of water taken from the stream has a high bacter X level,
+
+(a) find the frequentist estimator for $p$
+(b) using a $Beta(1, 10)$ prior for $p$, calculate and posterior distribution $P(p | y)$
+(c) find the bayesian estimator for $p$, the posterior mean and variance, and a 95% credible interval
+(d) test the hypothesis
+
+$$
+H_0 : p = 0.1 \qquad \text{versus} \qquad H_1 : p \neq 0.1
+$$
+
+at 5% level of significance with both the frequentist and bayesian approach.
+
+A new measurement, performed one month later on $n = 165$ water samples, gives $y = 9$ high bacter X level
+
+(e) find the frequentist estimator for $p$
+(f) find a bayesian estimator for $p$, assuming both a $Beta(1, 10)$ prior for $p$, and assuming the posterior probability of the older measurement as the prior for the new one.
+(g) find the bayesian estimator for $p$, the posterior mean and variance, and a 95% credible interval
+(h) test the hypothesis
+
+$$
+H_0 : p = 0.1 \qquad \text{versus} \qquad H_1 : p \neq 0.1
+$$
+
+at 5% level of significance with both the frequentist and bayesian approach.
+
+### Solution
+
+#### (a) Frequentist approach posterior
+
+In the frequentist paradigm, the probability $p$ that a sample of water taken from the stream has a high bacter X level is fixed and equal to
+
+$$
+\hat{p}_F = \frac{y}{n} = \frac{11}{116} \approx 0.0948
+$$
+
+The properties of the estimator are the following.
+
+$$
+E[\hat{p}_F] = p \qquad Var[\hat{p}_F] = \frac{p(1 − p)}{n} \qquad \text{so} \qquad Std[\hat{p}_F] = \sqrt{\frac{p(1 − p)}{n}}
+$$
+
+Therefore, the pdf of the parameter $\hat{p}_F$ is given by a Binomial distribution with the determined mean $\mu = \hat{p}\_F \approx 0.0948$ and standard deviation $\sigma = \sqrt{\frac{p(1 − p)}{n}} \approx 0.0272$.
+
+#### (b) Bayesian approach posterior
+
+Assuming now a prior of the type $Beta(a, b) = Beta(1, 10)$ for $p$, the posterior distribution is given by a Beta function as well, since a Beta prior is a conjugate function for the Binomial distribution and this is a binomial process.
+
+$$
+Beta(a'=a+y, \ b'=b+n-y) = Beta(12, 115)
+$$
+
+#### (c) Bayesian pdf parameters
+
+Having determined the shape of the Beta posterior distribution for $p$, it is now possible to calculate the mean, variance and 95% credibility intervals of such an estimator. Specifically,
+
+$$
+E[p_B] = \frac{\alpha}{\alpha + \beta} = \frac{12}{127} \approx 0.0945 \qquad Var(p_B) = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta + 1)} = \frac{12 \cdot 115}{127^2 \cdot 128} \approx 0.0007 \qquad \text{so} \qquad \sigma \approx 0.026
+$$
+
+```{r}
+n <- 116
+y <- 11
+
+x <- 0:n
+rate <- seq(0, 1, 1/n)
+freq_p <- dbinom(x, size = n, prob = y/n)
+plot(rate, freq_p, type = "l", main='Frequentist vs Bayesian pdfs', ylim=c(0, 0.15), xlim=c(0, 0.3), lty=1, lwd=1.5, col='white', xlab='p', ylab='P(p|y)')
+
+mu <- y/n
+sigma <- sqrt(mu*(1-mu)/n)
+
+bayes_p <- dbeta(rate, 12, 115)
+norm <- sum(dbeta(rate, 12, 115))
+
+set.seed(123)
+samples <- rbeta(10000, 12, 115)
+
+mean <- mean(samples)
+variance <- var(samples)
+
+cf <- 0.975
+cf_B <- qbeta(c(1-cf, cf), 12, 115)
+
+rate_red <- rate[rate >= cf_B[1] & rate <= cf_B[2]]
+pdf_red <- bayes_p[rate >= cf_B[1] & rate <= cf_B[2]]/norm
+polygon(c(cf_B[1], cf_B[1], rate_red, cf_B[2], cf_B[2]), c(0, 0.03, pdf_red, 0.015, 0), col = "pink", border = NA)
+
+
+lines(rate, freq_p, lty=1, lwd=1.5, col='blue')
+abline(v=mu, col='black', lwd=1.5, lty=1)
+abline(v=mu + sigma, col='blue', lwd=1.5, lty=2)
+abline(v=mu - sigma, col='blue', lwd=1.5, lty=2)
+lines(rate, bayes_p/norm, col='red', lwd=1.5, lty=1)
+abline(v=mean + sqrt(variance), col='firebrick', lwd=1.5, lty=2)
+abline(v=mean - sqrt(variance), col='firebrick', lwd=1.5, lty=2)
+
+leg.colors <- c('blue', 'black', 'blue', 'red', 'firebrick', 'pink')
+leg.labels <- c('Frequentist pdf', expression(paste(p[F], ' = ', p[B], ' = 0.095')), 'Frequentist 1-sigma interval', 'Bayesian pdf', 'Bayesian 1-sigma interval', 'Bayesian 95% credibility interval')
+leg.ltypes <- c(1, 1, 2, 1, 2, 1)
+leg.lwidths <- c(1.5, 1.5, 1.5, 1.5, 1.5, 10)
+legend("topright", legend=leg.labels, lty=leg.ltypes, col=leg.colors, lwd=leg.lwidths)
+
+```
+
+#### (d) Hypothesis testing
+
+I want to perform a Two-Sides Hypothesis Test. In the Frequentist approach the null distribution is equal to the sampling distribution $Bin(y|n = 116, p = 0.095)$, where the value of $p$ is the one obtained from the previous analysis. In defining the rejection region, we take into account that y has a discrete distribution, and choose the level of significance as close to 5% as possible.
+
+```{r}
+n <- 115
+p <- 0.1
+
+# Generate the possible values of y (number of successes)
+y_values <- 0:n
+
+# Calculate the probabilities for each value of y
+probabilities <- dbinom(y_values, size = n, prob = p)
+colors <- rep("lightblue", length(y_values))
+colors[y_values == 11] <- "forestgreen"
+
+# Create a bar plot of the probabilities
+barplot(probabilities[1:41], names.arg = y_values[0:41], main = "Binomial Distribution Bin(115, 0.095)", xlab = "y", ylab = "1-F(y)", col = colors, border = "black")
+abline(h=0.025, lty=4, col='red', lwd=1.5)
+text(33, 0.03, 'alpha = 5%', col='red', cex=0.8)
+
+```
+
+The null hypothesis is clearly accepted, as it does not lie in the rejection region for this level of significance. The frequentist result can also be obtained by means of a test implemented in R:
+
+```{r}
+binom.test(x=11, n=115, p=0.1, alternative = "two.sided")
+```
+
+As for a Bayesian approach to solve this problem, it can be observed in the plot at point (c) that the value $p=0.1$ falls well within the 95% credibility interval, and therefore the two-sides test cannot reject $H_0$.
+
+#### (e) Frequentist approach posterior
+
+In the frequentist paradigm, the probability $p$ that a sample of water taken from the stream has a high bacter X level is fixed and equal to
+
+$$
+\hat{p}_F = \frac{y}{n} = \frac{9}{165} \approx 0.0545
+$$
+
+Therefore, the pdf of the parameter $\hat{p}_F$ is given by a Binomial distribution with the determined mean $\mu = \hat{p}\_F \approx 0.05$ and standard deviation $\sigma = \sqrt{\frac{p(1 − p)}{n}} \approx 0.29$.
+
+#### (f) Bayesian approach posterior
+
+Assuming now a prior of the type $Beta(a, b) = Beta(1, 10)$ for $p$, the posterior distribution is given by a Beta function as well, since a Beta prior is a conjugate function for the Binomial distribution and this is a binomial process.
+
+$$
+P_1(p|y) = Beta(a'=a+y, \ b'=b+n-y) = Beta(10, 166)
+$$
+
+Alternatively, one could assume as a prior for $p$ the posterior given by the previous data collection, $Beta(12,115)$.
+
+$$
+P_2(p|y) = Beta(a'=a+y, \ b'=b+n-y) = Beta(21, 271)
+$$
+
+#### (g) Bayesian pdf parameters
+
+Having determined the two possible shapes of the Beta posterior distribution for $p$, it is now possible to calculate the mean, variance and 95% credibility intervals of such estimators. Specifically,
+
+$$
+E_1[p_B] = \frac{\alpha_1}{\alpha_1 + \beta_1} = \frac{10}{176} \approx 0.057 \qquad Var_1(p_B) = \frac{\alpha_1 \beta_1}{(\alpha_1 + \beta_1)^2 (\alpha_1 + \beta_1 + 1)} = \frac{10 \cdot 166}{176^2 \cdot 177} \approx 0.000325 \qquad \text{so} \qquad \sigma_1 \approx 0.018\\
+E_2[p_B] = \frac{\alpha_2}{\alpha_2 + \beta_2} = \frac{21}{292} \approx 0.072 \qquad Var_2(p_B) = \frac{\alpha_2 \beta_2}{(\alpha_2 + \beta_2)^2 (\alpha_2 + \beta_2 + 1)} = \frac{21 \cdot 271}{292^2 \cdot 293} \approx 0.000228 \qquad \text{so} \qquad \sigma_2 \approx 0.015
+$$
+
+```{r}
+n <- 165
+y <- 9
+
+x <- 0:n
+rate <- seq(0, 1, 1/n)
+freq_p <- dbinom(x, size = n, prob = y/n)
+plot(rate, freq_p, type = "l", main='Frequentist vs Bayesian pdfs', ylim=c(0, 0.2), xlim=c(0, 0.2), lty=1, lwd=1.5, col='white', xlab='p', ylab='P(p|y)')
+
+mu <- y/n
+sigma <- sqrt(mu*(1-mu)/n)
+
+alpha1 <- 10
+beta1 <- 166
+bayes_p1 <- dbeta(rate, alpha1, beta1)
+norm1 <- sum(dbeta(rate, alpha1, beta1))
+
+set.seed(123)
+samples1 <- rbeta(10000, alpha1, beta1)
+
+mean1 <- mean(samples1)
+variance1 <- var(samples1)
+
+cf <- 0.975
+cf_B1 <- qbeta(c(1-cf, cf), alpha1, beta1)
+
+rate_red1 <- rate[rate >= cf_B1[1] & rate <= cf_B1[2]]
+pdf_red1 <- bayes_p1[rate >= cf_B1[1] & rate <= cf_B1[2]]/norm1
+polygon(c(cf_B1[1], cf_B1[1], rate_red1, cf_B1[2], cf_B1[2]), c(0, 0.03, pdf_red1, 0.015, 0), col = rgb(255/255, 130/255, 171/255, 0.5), border = NA)
+
+
+alpha2 <- 21
+beta2 <- 271
+bayes_p2 <- dbeta(rate, alpha2, beta2)
+norm2 <- sum(dbeta(rate, alpha2, beta2))
+
+set.seed(123)
+samples2 <- rbeta(10000, alpha2, beta2)
+
+mean2 <- mean(samples2)
+variance2 <- var(samples2)
+
+cf <- 0.975
+cf_B2 <- qbeta(c(1-cf, cf), alpha2, beta2)
+
+rate_red2 <- rate[rate >= cf_B2[1] & rate <= cf_B2[2]]
+pdf_red2 <- bayes_p2[rate >= cf_B2[1] & rate <= cf_B2[2]]/norm2
+polygon(c(cf_B2[1], cf_B2[1], rate_red2, cf_B2[2], cf_B2[2]), c(0, 0.03, pdf_red2, 0.02, 0), col = rgb(0/255, 255/255, 0/255, 0.25), border = NA)
+
+
+lines(rate, freq_p, lty=1, lwd=1.5, col='blue')
+abline(v=mu, col='navy', lwd=1.5, lty=2)
+lines(rate, bayes_p1/norm1, col='red', lwd=1.5, lty=1)
+abline(v=mean1, col='firebrick', lwd=1.5, lty=2)
+lines(rate, bayes_p2/norm2, col='green3', lwd=1.5, lty=1)
+abline(v=mean2, col='darkgreen', lwd=1.5, lty=2)
+
+leg.colors <- c('blue', 'navy', 'red', 'firebrick', rgb(255/255, 130/255, 171/255, 0.5), 'green3', 'darkgreen', rgb(0/255, 255/255, 0/255, 0.25))
+leg.labels <- c('Frequentist pdf', paste('Frequentist mean = ', signif(mu, 3)), 'Bayesian pdf Beta(10,166)', paste('Beta(10,166) mean = ', signif(mean1, 3)), '95% cred. int. for Beta(10,166)', 'Bayesian pdf Beta(21,271)', paste('Beta(21,271) mean = ', signif(mean2, 3)), '95% cred. int. for Beta(21,271)')
+leg.ltypes <- c(1, 2, 1, 2, 1, 1, 2, 1)
+leg.lwidths <- c(1.5, 1.5, 1.5, 1.5, 10, 1.5, 1.5, 10)
+legend("topright", legend=leg.labels, lty=leg.ltypes, col=leg.colors, lwd=leg.lwidths, cex=0.75)
+
+```
+
+#### (h) Hypothesis Testing
+
+Frequentist test in R:
+
+```{r}
+binom.test(x=9, n=165, p=0.1, alternative = "two.sided")
+```
+
+The null hypothesis is therefore not rejected by the test. As for a Bayesian approach to solve this problem, it can be observed in the plot at point (g) that the value $p=0.1$ falls outside the 95% credibility interval for the $Beta(1, 10)$ choice of the prior, while $H_0$ is instead accepted by assuming $Beta(12,115)$ as a prior.
+
+## Exercise 4
+
+Analyze the data of Exercise 3 and solve points (b) and (c) using a Markov Chain Monte Carlo using stan.
+
+### Solution
+
+```{r}
+library(rstan)
+options(mc.cores=parallel::detectCores())
+parallel::detectCores()
+rstan_options(auto_write = TRUE)
+
+n <- 115
+y <- 11
+dataList <- list(n=n, y=y)
+
+modelString = "
+  data {
+    int<lower=0> n;
+    int y;
+  }
+  parameters {
+    real<lower=0,upper=1> p;
+  }
+  model {
+    p ~ beta(1, 10);
+    y ~ binomial(n, p);
+  }
+"
+writeLines(modelString, con="stan_Binomial_model.stan")
+
+stanDso <- stan_model(model_code=modelString)
+n_chains <- 2
+# initialization with the mean value of p estimated in Exercise 3
+initializers_list <- replicate(n_chains, list(p = 0.095), simplify = FALSE)
+
+stanFit <- sampling(
+  object = stanDso,
+  data = dataList,
+  chains = n_chains,
+  iter = 1000, 
+  warmup = 200,
+  thin = 1,
+  init = initializers_list
+  )
+
+
+library(coda)
+mcmcCoda <- mcmc.list(lapply(1:ncol(stanFit), function(p) {mcmc(as.array(stanFit)[, p,])} ))
+summary(mcmcCoda)
+
+plot(mcmcCoda[, 'p'])
+
+my.lags = seq(0,500,10)
+y1 <- autocorr(mcmcCoda, lags=my.lags)
+colors <- c('red', 'blue', 'darkgreen', 'orange', 'violet')
+
+plot(my.lags, my.lags, ylim=c(-0.2,1.1), xlab='lag', ylab='ACF', col='white')
+for (i in 1:n_chains){
+  lines(my.lags, y1[[i]][, ,'p'][,'p'], col=colors[i], lwd=2)
+}
+
+legend("topright", legend=c('chain 1', 'chain 2', 'chain 3', 'chain 4', 'chain 5')[1:n_chains], col=colors, lty=1, lwd = 2)
+
+```
