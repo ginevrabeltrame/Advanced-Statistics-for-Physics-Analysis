@@ -1,0 +1,843 @@
+---
+title: "Beltrame_Ginevra_Rlab03"
+output: html_document
+date: "2024-05-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1: Bayesian Inference for Poisson model
+
+The number of particles emitted by a radioactive source during a fixed interval of time (∆t = 10 s) follows a Poisson distribution on the parameter µ. The number of particles observed during consecutive time intervals is: 4, 1, 3, 1, 5 and 3.
+
+(a) assuming a positive uniform prior distribution for the parameter µ:
+    -   determine and draw the posterior distribution for µ, given the data
+    -   evaluate mean, median and variance, both analytically and numerically in R
+(b) assuming a Gamma prior such that the expected value is µ = 3 with a standard deviation σ = 1,
+    -   determine and draw the posterior distribution for µ, given the data
+    -   evaluate mean, median and variance, both analytically and numerically in R.
+(c) evaluate a 95% credibility interval for the results obtained with different priors. Compare the result with that obtained using a normal approximation for the posterior distribution, with the same mean and standard deviation
+
+### Solution
+
+#### (a) Uniform prior
+
+Assuming a Uniform prior on a Poisson process signifies that the distribution of the parameter $\mu$ follows the constant function $g(\mu) = 1$. This means that the posterior is of the form $Gamma(α, λ)$, with $α = \sum{y_j} + 1$ and $λ = n$.
+
+From the given experimental data we know that $n=6$ and $\{y_j\}_{j=1...n} = \{4, 1, 3, 1, 5, 3\}$. Therefore we obtain
+
+$$
+Gamma(α, λ) = Gamma(18, 6)
+$$
+
+We can finally draw the posterior distribution.
+
+```{r, echo=TRUE}
+y_i <- c(4, 1, 3, 1, 5, 3)
+alpha_u <- sum(y_i) + 1
+lambda_u <- length(y_i)
+
+x <- seq(0, 10, length.out = 100)
+y_u <- dgamma(x, shape = alpha_u, rate = lambda_u)
+data_u <- data.frame(x = x, y = y_u)
+```
+
+As for the mean, variance and median of the distribution, they can be derived both analytically and numerically with R. Specifically, the analytic form of the $Gamma$ pdf is the following
+
+$$
+f(x) = \frac{1}{\Gamma(\alpha)} x^{\alpha-1} \lambda^{\alpha} e^{-\lambda x}
+$$
+
+We can therefore derive the mean and variance in a closed form by integration.
+
+$$
+E[X] = \int_{0}^{\infty} xf(x) \, dx = \frac{\lambda^\alpha}{\Gamma(\alpha)} \int_{0}^{\infty} x^\alpha e^{-\lambda x} \, dx \\
+E[X^2] = \int_{0}^{\infty} x^2 f(x) \, dx = \frac{\lambda^\alpha}{\Gamma(\alpha)} \int_{0}^{\infty} x^{\alpha+1} e^{-\lambda x} \, dx
+$$
+
+These can be solved by applying the substitution $u=\lambda x$, hence $dx=\frac{du}{\lambda}$:
+
+$$
+E[X] = \frac{\lambda^\alpha}{\Gamma(\alpha)} \int_{0}^{\infty} (\frac{u}{\lambda})^\alpha e^{-u} \, \frac{du}{\lambda} = \frac{1}{\Gamma(\alpha) \lambda} \int_{0}^{\infty} u^\alpha e^{-u} \, du = \frac{\Gamma(\alpha+1)}{\Gamma(\alpha) \lambda} = \frac{\alpha}{\lambda}\\
+E[X^2] = \frac{\lambda^\alpha}{\Gamma(\alpha)} \int_{0}^{\infty} (\frac{u}{\lambda})^{\alpha+1} e^{-u} \, \frac{du}{\lambda} = \frac{1}{\Gamma(\alpha) \lambda^2} \int_{0}^{\infty} u^{\alpha+1} e^{-u} \, du = \frac{\Gamma(\alpha+2)}{\Gamma(\alpha) \lambda^2} = \frac{\alpha(\alpha+1)}{\lambda^2} 
+$$
+
+Thus
+
+$$
+E[X] = \frac{\alpha}{\lambda} = \frac{18}{6} = 3\\
+Var(X) = E[X^2] - E[X]^2 = \frac{\alpha(\alpha+1)}{\lambda^2} - \frac{\alpha^2}{\lambda^2} = \frac{\alpha}{\lambda^2} = \frac{18}{36} = 0.5
+$$
+
+As for the median, it cannot be calculated analytically, although it can be said that for large values of the shape parameter $α$, the Gamma distribution approximates the normal distribution and the median is therefore approximated by the mean $\frac{\alpha}{\lambda}$.
+
+We compute now the same results in a numerical fashion, using R.
+
+```{r, echo=TRUE}
+# Define shape and rate parameters
+shape <- alpha_u
+rate <- lambda_u
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_unif <- qgamma(0.5, shape = shape, rate = rate)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape, rate)
+
+mean_unif <- mean(samples)
+variance_unif <- var(samples)
+
+cat("Estimated Mean:", mean_unif, "\n")
+cat("Estimated Variance:", variance_unif, "\n")
+cat("Estimated Median:", median_unif, "\n")
+
+```
+
+It can be observed that these results are quite similar to the analytical ones.
+
+#### (b) Gamma prior
+
+We assume now a Gamma prior, such that the expected value is $\mu = 3$ with a standard deviation is $σ = 1$. Based on the previous analytical results on the Gamma distribution, we can determine the shape and rate (or scale) parameters.
+
+$$
+\mu = \frac{\alpha}{\lambda} \qquad \text{and} \qquad \sigma^2 = \frac{\alpha}{\lambda^2} \\
+\text{therefore} \qquad \lambda = \frac{\mu}{\sigma^2} = 3 \qquad \text{and} \qquad \alpha = \frac{\mu^2}{\sigma^2} = 9
+$$
+
+The prior is then the function $Gamma(9,3)$, resulting in a posterior of the form $Gamma(\alpha',\lambda')$ with $α' = α + \sum{y_j} = 9 + 17 = 26$ and $λ'= λ + n = 3 + 6 = 9$. So
+
+$$
+Gamma(α, λ) = Gamma(26, 9)
+$$
+
+and we can draw the posterior distribution.
+
+```{r, echo=TRUE}
+y_i <- c(4, 1, 3, 1, 5, 3)
+mu <- 3
+sigma <- 1
+alpha_g <- mu^2/sigma^2 + sum(y_i)
+lambda_g <- mu/sigma^2 + length(y_i)
+
+y_g <- dgamma(x, shape = alpha_g, rate = lambda_g)
+data_g <- data.frame(x = x, y = y_g)
+```
+
+It follows that the mean, variance and median can be determined analytically as
+
+$$
+E[X] = \frac{\alpha}{\lambda} = \frac{26}{9} \approx 2.89\\
+Var(X) = E[X^2] - E[X]^2 = \frac{\alpha(\alpha+1)}{\lambda^2} - \frac{\alpha^2}{\lambda^2} = \frac{\alpha}{\lambda^2} = \frac{26}{81} \approx 0.32 \\
+Median(X) \approx E[X] \approx 2.89
+$$
+
+and numerically as
+
+```{r, echo=TRUE}
+# Define shape and rate parameters
+shape <- alpha_g
+rate <- lambda_g
+
+# I calculate the median of the Gamma distribution with a quantile function
+median_gamma <- qgamma(0.5, shape = shape, rate = rate)
+# and the mean and variance with a numerical simulation
+set.seed(123)
+samples <- rgamma(10000, shape, rate)
+
+mean_gamma <- mean(samples)
+variance_gamma <- var(samples)
+
+cat("Estimated Mean:", mean_gamma, "\n")
+cat("Estimated Variance:", variance_gamma, "\n")
+cat("Estimated Median:", median_gamma, "\n")
+
+```
+
+```{r}
+plot(data_g$x, data_g$y, type = "l", main='Gamma vs Uniform prior', ylim=c(0, 0.75), xlim=c(0, 10), lty=1, lwd=1.5, col='white', xlab='x', ylab='Posterior')
+
+x_red_g <- data_g$x[data_g$x >= mean_gamma - sqrt(variance_gamma) & data_g$x <= mean_gamma + sqrt(variance_gamma)]
+y_red_g <- data_g$y[data_g$x >= mean_gamma - sqrt(variance_gamma) & data_g$x <= mean_gamma + sqrt(variance_gamma)]
+polygon(c(mean_gamma - sqrt(variance_gamma), mean_gamma - sqrt(variance_gamma), x_red_g, mean_gamma + sqrt(variance_gamma), mean_gamma + sqrt(variance_gamma)), c(0, 0.12, y_red_g, 0.09, 0), col = rgb(255/255, 130/255, 171/255, 0.5), border = NA)
+
+x_red_u <- data_u$x[data_u$x >= mean_unif - sqrt(variance_unif) & data_u$x <= mean_unif + sqrt(variance_unif)]
+y_red_u <- data_u$y[data_u$x >= mean_unif - sqrt(variance_unif) & data_u$x <= mean_unif + sqrt(variance_unif)]
+polygon(c(mean_unif - sqrt(variance_unif), mean_unif - sqrt(variance_unif), x_red_u, mean_unif + sqrt(variance_unif), mean_unif + sqrt(variance_unif)), c(0, 0.38, y_red_u, 0.3, 0), col = rgb(130/255, 200/255, 255/255, 0.5), border = NA)
+
+
+lines(data_g$x, data_g$y, lty=1, lwd=1.5, col='red')
+abline(v=mean_gamma, col='darkred', lwd=1, lty=2)
+lines(data_u$x, data_u$y, col='blue', lwd=1.5, lty=1)
+abline(v=mean_unif, col='navy', lwd=1, lty=2)
+
+leg.colors <- c('red', 'darkred', rgb(255/255, 130/255, 171/255, 0.5), 'blue', 'navy', rgb(130/255, 200/255, 255/255, 0.5))
+leg.labels <- c('Gamma prior', 'Gamma prior mean', '1-sigma interval gamma prior', 'Uniform prior', 'Unif prior mean', '1-sigma interval unif prior')
+leg.ltypes <- c(1, 2, 1, 1, 2, 1)
+leg.lwidths <- c(1.5, 1, 10, 1.5, 1, 10)
+legend("topright", legend=leg.labels, lty=leg.ltypes, col=leg.colors, lwd=leg.lwidths, cex=0.75)
+
+```
+
+#### (c) 95% credibility intervals
+
+```{r, echo=TRUE}
+cf <- 0.975
+
+y_ng <- dnorm(x, mean_gamma, sqrt(variance_gamma))
+data_ng <- data.frame(x = x, y = y_ng, group='normal from gamma')
+
+y_nu <- dnorm(x, mean_unif, sqrt(variance_unif))
+data_nu <- data.frame(x = x, y = y_nu, group='normal from unif')
+
+cf_g <- qgamma(c(1-cf, cf), alpha_g, lambda_g)
+cf_u <- qgamma(c(1-cf, cf), alpha_u, lambda_u)
+cf_ng <- qnorm(c(1-cf, cf), mean = mean_gamma, sd = sqrt(variance_gamma))
+cf_nu <- qnorm(c(1-cf, cf), mean = mean_unif, sd = sqrt(variance_unif))
+
+cat("95% CREDIBILITY INTERVALS\n")
+cat("Gamma distribution - uniform prior case: [", cf_u[1], ",", cf_u[2], "]\n")
+cat("Normal distribution - uniform prior case: [", cf_nu[1], ",", cf_nu[2], "]\n")
+cat("Gamma distribution - gamma prior case: [", cf_g[1], ",", cf_g[2], "]\n")
+cat("Normal distribution - gamma prior case: [", cf_ng[1], ",", cf_ng[2], "]\n")
+
+
+plot(data_g$x, data_g$y, type = "l", main='95% credibility intervals \nGamma vs Uniform prior vs Normal approximation', ylim=c(0, 0.75), xlim=c(0, 10), lty=1, lwd=1.5, col='white', xlab='x', ylab='Posterior')
+
+x_red_g <- data_g$x[data_g$x >= cf_g[1] & data_g$x <= cf_g[2]]
+y_red_g <- data_g$y[data_g$x >= cf_g[1] & data_g$x <= cf_g[2]]
+polygon(c(cf_g[1], cf_g[1], x_red_g, cf_g[2], cf_g[2]), c(0, 0.12, y_red_g, 0.09, 0), col = rgb(255/255, 130/255, 171/255, 0.5), border = NA)
+
+x_red_u <- data_u$x[data_u$x >= cf_u[1] & data_u$x <= cf_u[2]]
+y_red_u <- data_u$y[data_u$x >= cf_u[1] & data_u$x <= cf_u[2]]
+polygon(c(cf_u[1], cf_u[1], x_red_u, cf_u[2], cf_u[2]), c(0, 0.08, y_red_u, 0.06, 0), col = rgb(130/255, 200/255, 255/255, 0.5), border = NA)
+
+
+lines(data_g$x, data_g$y, lty=1, lwd=1.5, col='red')
+lines(data_ng$x, data_ng$y, lty=2, lwd=1.5, col='darkred')
+abline(v=c(cf_ng[1], cf_ng[2]), col='red', lwd=1, lty=3)
+lines(data_u$x, data_u$y, col='blue', lwd=1.5, lty=1)
+lines(data_nu$x, data_nu$y, lty=2, lwd=1.5, col='navy')
+abline(v=c(cf_nu[1], cf_nu[2]), col='blue', lwd=1, lty=3)
+
+leg.colors <- c('red', 'darkred', rgb(255/255, 130/255, 171/255, 0.5), 'red', 'blue', 'navy', rgb(130/255, 200/255, 255/255, 0.5), 'blue')
+leg.labels <- c('Gamma prior', 'Gamma prior - normal approx', '95% c.i. gamma prior', '95% c.i. normal gamma approx', 'Uniform prior', 'Unif prior - normal approx', '95% c.i. unif prior', '95% c.i. normal unif approx')
+leg.ltypes <- c(1, 2, 1, 3, 1, 2, 1, 3)
+leg.lwidths <- c(1.5, 1.5, 10, 1, 1.5, 1.5, 10, 1)
+legend("topright", legend=leg.labels, lty=leg.ltypes, col=leg.colors, lwd=leg.lwidths, cex=0.75)
+
+```
+
+
+## Exercise 2: Efficiency using Bayesian approach
+
+A researcher A wants to evaluate the efficiency of detector 2 (Det2). For this purpose, he sets up the apparatus shown in the figure 1, where Det2 is sandwiched between Det1 and Det3. Let $n$ be the number of signals recorded simultaneously by Det1 and Det3, and $r$ be those also recorded by Det2, researcher A obtains $n = 500$ and $r = 312$.
+
+Assuming a binomial model where $n$ is the number of trials and $r$ is the number of success out of $n$ trials,
+
+(a) Evaluate the mean and the variance using a Bayesian approach under the hypothesis of:
+    -   uniform prior ∼ $U(0, 1)$
+    -   Jeffrey’s prior ∼ $Beta(1/2, 1/2)$
+(b) Plot the posterior distributions for both cases
+
+Taking into account that the same detector has been studied by researcher B, who has performed only $n = 10$ measurements and has obtained $r = 10$ signals,
+
+(c) Evaluate the mean, the variance and the posterior distribution using a uniform prior with the results of researcher B.
+(d) Repeat the computation of points a) and b) with the data of researcher A using as a prior the posterior obtained from point c).
+(e) [Optional] Compute 95% credible interval using the posterior of the previous point d).
+
+### Solution
+
+#### (a, b) Mean, variance and posterior distributions of researcher A
+
+It is assumed that the events follow a binomial distribution, in the form of
+
+$$
+Bn(x|p,n) = \binom{n}{x} p^x (1-p)^{n-x}
+$$
+
+where the probability of success $p = \frac{r}{n} = 0.624$ is computed from the experimental data. This expression gives the probability of $x$ successes in $n$ independent Bernoulli trials. We also adopt, alternatively, a uniform prior and Jeffrey's prior.
+
+##### Uniform prior
+
+The prior is in this case $P(\pi|H) \thicksim U(0,1) = Beta(1,1)$, so that the posterior pdf is proportional to the likelihood.
+
+$$
+P(\pi | r,n,H) = Beta(r+1, n-r+1) = Beta(313, 188)
+$$
+
+It can be inferred in this case that the mean and variance are calculated from
+
+$$
+E[\pi] = \int_{0}^{1} \pi P(\pi | r,n,H) d\pi = \frac{1}{Z} \int_{0}^{1} \pi^{r+1} (1-\pi)^{n-r} d\pi \\
+E[\pi^2] = \int_{0}^{1} \pi^2 P(\pi | r,n,H) d\pi = \frac{1}{Z} \int_{0}^{1} \pi^{r+2} (1-\pi)^{n-r} d\pi \\
+\text{with the normalization factor} \quad Z = \int_{0}^{1} \pi^{r} (1-\pi)^{n-r} d\pi \quad \text{and with} \quad n=500, r=312, \quad Var(\pi) = E[\pi^2] - E[\pi]^2 
+$$
+
+These integrals can be calculated numerically or analytically by using the Beta and Gamma functions. Specifically, the Beta function is defined as $B(x,y) = \int_{0}^{1} t^{x-1} (1-t)^{y-1} dt = \frac{\Gamma(x) \Gamma(y)}{\Gamma(x+y)}$, so the previous expressions can be rewritten as follows.
+
+$$
+E[\pi] = \frac{1}{Z} \int_{0}^{1} \pi^{(r+2)-1} (1-\pi)^{(n-r+1)-1} d\pi = \frac{1}{Z} B(r+2,n-r+1) = \frac{1}{Z} \frac{\Gamma(r+2) \Gamma(n-r+1)}{\Gamma(n+3)} \\
+E[\pi^2] = \frac{1}{Z} \int_{0}^{1} \pi^{(r+3)-1} (1-\pi)^{(n-r+1)-1} d\pi = \frac{1}{Z} B(r+3,n-r+1) = \frac{1}{Z} \frac{\Gamma(r+3) \Gamma(n-r+1)}{\Gamma(n+4)} \\
+Z = \int_{0}^{1} \pi^{(r+1)-1} (1-\pi)^{(n-r+1)-1} d\pi = B(r+1,n-r+1) = \frac{\Gamma(r+1) \Gamma(n-r+1)}{\Gamma(n+2)}
+$$
+
+it follows
+
+$$
+E[\pi] = \frac{\Gamma(n+2)}{\Gamma(r+1) \Gamma(n-r+1)} \frac{\Gamma(r+2) \Gamma(n-r+1)}{\Gamma(n+3)} = \frac{(n+1)!(r+1)!(n-r)!}{r!(n-r)!(n+2)!} = \frac{r+1}{n+2} = \frac{313}{502} \approx 0.6235\\
+E[\pi^2] = \frac{\Gamma(n+2)}{\Gamma(r+1) \Gamma(n-r+1)} \frac{\Gamma(r+3) \Gamma(n-r+1)}{\Gamma(n+4)} = \frac{(n+1)!(r+2)!(n-r)!}{r!(n-r)!(n+3)!} = \frac{(r+2)(r+1)}{(n+3)(n+2)} = \frac{314 \cdot 313}{503 \cdot 502} \approx 0.3892 \\
+Var(\pi) \approx 0.3892 - 0.6235^2 \approx 0.0005
+$$
+
+
+```{r, echo=TRUE, fig.width=8, fig.height=4}
+n <- 500
+r <- 312
+n.sample <- 2000
+
+plot_dist <- function(dist_function) {
+  
+  p <- seq(0, 1, 1/n.sample)
+  posterior <- lapply(p, dist_function)
+  
+  y_values <- sapply(posterior, function(p) p$y)
+  p.mean <- posterior[[1]]$mean
+  p.variance <- posterior[[1]]$var
+  
+  p_red <- p[p >= p.mean - sqrt(p.variance) & p <= p.mean + sqrt(p.variance)]
+  y_red <- y_values[p >= p.mean - sqrt(p.variance) & p <= p.mean + sqrt(p.variance)]
+  
+  plot(p, p, col='white', xlim=c(0,1), ylim=c(0, max(y_values)), xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')))
+  polygon(c(p.mean - sqrt(p.variance), p.mean - sqrt(p.variance), p_red, p.mean + sqrt(p.variance), p.mean + sqrt(p.variance)), c(0, 0.38, y_red, 0.3, 0), col = rgb(130/255, 200/255, 255/255, 0.5), border = NA)
+  
+  lines(p, y_values, lwd=1.5, col='blue')
+  
+  abline(v=p.mean, lty=2)
+  text(x = p.mean + 0.01, y = max(y_values) + 0.2, labels = expression(mu), col = "black", cex = 0.5)
+  
+  abline(v=p.mean - sqrt(p.variance) , lty=2, col='red')
+  abline(v=p.mean + sqrt(p.variance) , lty=2, col='red')
+  text(x = p.mean - sqrt(p.variance) - 0.02, y = max(y_values) + 0.2, labels = expression(mu - sigma), col = "firebrick", cex = 0.5)
+  text(x = p.mean + sqrt(p.variance) + 0.02, y = max(y_values) + 0.2, labels = expression(mu + sigma), col = "firebrick", cex = 0.5)
+}
+
+```
+
+```{r}
+
+unif_posterior <- function(p){
+  alpha <- r+1
+  beta <- n-r+1
+  return(list(y=dbeta(p, alpha, beta), mean=alpha/(alpha+beta), var=(alpha*beta)/((alpha+beta)^2 * (alpha+beta+1))))
+}
+
+plot_dist(unif_posterior)
+title(main='Posterior distribution with Uniform prior')
+```
+
+##### Jeffrey's prior
+
+The prior is in this case $P(\pi|H) \thicksim Beta(1/2, 1/2)$, so that the posterior pdf is
+
+$$
+P(\pi | r,n,H) = Beta(r + α, n − r + β) = Beta(312.5, 187.5) \\
+\text{with} \qquad E[\pi] = \frac{\alpha}{\alpha+\beta} = \frac{r + \frac{1}{2}}{n+1} = \frac{312.5}{501} \approx 0.62375 \\
+\text{and} \qquad Var(\pi) = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta +1)} = \frac{(r + \frac{1}{2})(n-r+\frac{1}{2})}{(n+1)^2(n+2)} = \frac{312.5 \cdot 187.5}{501^2 \cdot 502} \approx 0.00047
+$$
+
+
+```{r}
+
+jeffrey_posterior <- function(p){
+  alpha <- r+0.5
+  beta <- n-r+0.5
+  return(list(y=dbeta(p, alpha, beta), mean=alpha/(alpha+beta), var=(alpha*beta)/((alpha+beta)^2 * (alpha+beta+1))))
+}
+
+plot_dist(jeffrey_posterior)
+title(main="Posterior distribution with Jeffrey's prior")
+```
+
+#### (c) Mean, variance and posterior distributions of researcher B
+
+Assuming a uniform prior with the results of researcher B, that is with $n=10$, $r=10$, we get the posterior
+
+$$
+P(\pi | r,n,H) = Beta(r+1, n-r+1) = Beta(11, 1) \\
+$$
+
+It can be inferred that the mean and variance are
+
+$$
+E[\pi] = \frac{11}{12} \approx 0.9167 \quad \text{and} \quad Var(\pi) = \frac{11\cdot 1}{12^2 \cdot 13} \approx 0.0059
+$$
+
+```{r}
+
+B_posterior <- function(p){
+  alpha <- 11
+  beta <- 1
+  return(list(y=dbeta(p, alpha, beta), mean=alpha/(alpha+beta), var=(alpha*beta)/((alpha+beta)^2 * (alpha+beta+1))))
+}
+
+plot_dist(B_posterior)
+title(main="Posterior distribution with Researcher B's prior")
+```
+
+#### (d) Mean, variance and posterior distributions from the new prior
+
+The posterior obtained from point (c) is assumed as the new Beta prior, so that $P(\pi|H) = 11\pi^{10} = Beta(11,1)$. The new posterior pdf is then obtained by multiplying it by the likelihood, as in the following. The experimental data are once again $n=500$, $r=312$.
+
+$$
+P(\pi | r,n,H) = Beta(323, 189) \qquad E[\pi] = \frac{323}{512} \approx 0.63086 \qquad Var(\pi) = \frac{323 \cdot 189}{512^2 \cdot 513} \approx 0.00045
+$$
+
+```{r}
+
+new_posterior <- function(p){
+  alpha <- 323
+  beta <- 189
+  return(list(y=dbeta(p, alpha, beta), mean=alpha/(alpha+beta), var=(alpha*beta)/((alpha+beta)^2 * (alpha+beta+1))))
+}
+
+plot_dist(new_posterior)
+title(main="Posterior distribution with Researcher B's posterior as prior")
+
+```
+
+```{r}
+p <- seq(0, 1, 1/n.sample)
+
+plot(p, p, col='white', xlim=c(0,1), ylim=c(0, 20), xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')), main='Posterior distributions comparison')
+
+colors <- c('red', 'blue', 'violet', 'green3')
+labels <- c('Res A, uniform prior', "Res. A, Jeffrey's prior", 'Res B, uniform prior', "Res. A, Res. B's prior")
+ltypes <- c(1, 2, 1, 1)
+dist_functions <- list(unif_posterior, jeffrey_posterior, B_posterior, new_posterior)
+
+for (i in 1:4){
+  posterior <- lapply(p, dist_functions[[i]])
+  y_values <- sapply(posterior, function(p) p$y)
+  lines(p, y_values, lwd=1.5, col=colors[i], lty=ltypes[i])
+}
+
+legend('topleft', col=colors, legend=labels, lwd=1.5, lty=ltypes[i])
+```
+  
+#### (e) 95% crediblity interval
+
+From the given posterior 
+
+$$
+P(\pi | r,n,H) = \frac{1}{B(323, 189)} \pi^{322} (1-\pi)^{188}
+$$
+
+a credibility interval $[a,b]$ amounting to the 95% of the total integral can be derived by solving (numerically!) the equations below.
+
+$$
+0.025 = \frac{1}{B(323, 189)} \int^{a}_{0} \pi^{322} (1-\pi)^{188} d\pi\\
+\text{and} \\
+0.975 = \frac{1}{B(323, 189)} \int^{b}_{0} \pi^{322} (1-\pi)^{188} d\pi
+$$
+
+
+```{r, echo=TRUE, fig.width=8, fig.height=4}
+
+new_posterior_cred <- function(p){
+  alpha <- 323
+  beta <- 189
+  return(dbeta(p, alpha, beta))
+}
+
+plot_cred_int <- function(dist_function) {
+  
+  p <- seq(0, 1, 1/n.sample)
+  
+  y_values <- sapply(p, dist_function)
+  
+  # Define the integral function from 0 to a
+  integral_to_a <- function(a) {
+    integrate(dist_function, lower = 0, upper = a)$value
+  }
+  
+  # Define the function to solve the equation
+  find_a <- function(target) {
+    to_solve <- function(a) {
+      integral_to_a(a) - target
+    }
+    
+    # Use uniroot to find the root in a reasonable interval
+    result <- uniroot(to_solve, lower = 0, upper = 1)
+    return(result$root)
+  }
+  
+  # Find a such that the integral equals 0.025
+  a_value <- find_a(0.025)
+  b_value <- find_a(0.975)
+  
+  cat("The 95% credibility interval is [", a_value, ",", b_value, "].\n")
+  
+  p_red <- p[p >= a_value & p <= b_value]
+  y_red <- y_values[p >= a_value & p <= b_value]
+  
+  plot(p, p, col='white', xlim=c(0,1), ylim=c(0, max(y_values)), xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')))
+  polygon(c(a_value, a_value, p_red, b_value, b_value), c(0, 0.38, y_red, 0.3, 0), col = rgb(130/255, 200/255, 255/255, 0.5), border = NA)
+  
+  lines(p, y_values, lwd=1.5, col='blue')
+  
+  abline(v=a_value, lty=2, col='red')
+  abline(v=b_value, lty=2, col='red')
+}
+
+plot_cred_int(new_posterior_cred)
+title(main="Posterior distribution with Researcher A's posterior as prior\n 95% credibility interval")
+```
+
+## Exercise 3 - Bayesian Inference for Binomial model
+
+A coin is flipped $n = 30$ times with the following outcomes:
+
+$T, T, T, T, T, H, T, T, H, H, T, T, H, H, H, T, H, T, H, T, H, H, T, H, T, H, T, H, H, H$
+
+(a) Assuming a flat prior, and a beta prior, plot the likelihood, prior and posterior distributions for the data set.
+(b) Evaluate the most probable value for the coin probability p and, integrating the posterior probability distribution, give an estimate for a 95% credibility interval.
+(c) Repeat the same analysis assuming a sequential analysis of the data. Show how the most probable value and the credibility interval change as a function of the number of coin tosses (i.e. from 1 to 30).
+(d) Do you get a different result, by analyzing the data sequentially with respect to a one-step analysis (i.e. considering all the data as a whole)?
+
+### Solution
+
+#### (a) Likelihood, prior and posterior distributions
+
+Assuming that the desired outcome of the coin tossing is tails, we get $n=30$ and $r=15$. Two different priors are considered, a uniform prior $Beta(1, 1)$ and a Beta prior $Beta(\alpha, \beta)$, yielding the following posteriors.
+
+$$
+P_{unif}(\pi | r,n,H) = Beta(r+1, n-r+1) = Beta(16, 16)\\
+P_{beta}(\pi | r,n,H) = Beta(r+\alpha, n-r+\beta) = Beta(15 + \alpha, 15 + \beta)
+$$
+
+```{r, echo=TRUE}
+n <- 30
+r <- 15
+# different values for alpha and beta yield different results for the prior and posterior distributions
+alpha <- 10
+beta <- 10
+
+likelihood <- function(x) {
+  return(choose(n,r) * x^r * (1-x)^{n-r})
+}
+
+unif_prior <- function(x) {
+  return(dbeta(x, 1, 1))
+}
+
+beta_prior <- function(x) {
+  return(dbeta(x, alpha, beta))
+}
+
+unif_posterior <- function(x) {
+  return(dbeta(x, 16, 16))
+}
+
+beta_posterior <- function(x) {
+  return(dbeta(x, 15+alpha, 15+beta))
+}
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+y_likelihood <- sapply(p, likelihood)
+y_unifprior <- sapply(p, unif_prior)
+y_betaprior <- sapply(p, beta_prior)
+y_unifpost <- sapply(p, unif_posterior)
+y_betapost <- sapply(p, beta_posterior)
+
+max_value <- max(y_likelihood, y_unifpost, y_unifprior, y_betapost, y_betaprior)
+
+plot(p, y_likelihood , type="l", lwd=1.5, col='firebrick', xlim=c(0,1), ylim=c(0,max_value+0.5), xaxs="i", yaxs="i", xlab=expression(pi), ylab='y')
+lines(p, y_unifprior , type="l", lwd=1.5, col='navy')
+lines(p, y_unifpost , type="l", lwd=1.5, col='blue')
+lines(p, y_betaprior , type="l", lwd=1.5, col='darkgreen')
+lines(p, y_betapost , type="l", lwd=1.5, col='green')
+legend("topleft", legend=c("likelihood", "uniform prior", "uniform posterior", "beta prior", "beta posterior"), col=c("firebrick", "navy", "blue", "darkgreen", "green"), lwd=1.5)
+
+p.mean.b <- delta.p*sum(p*y_betapost)
+p.mean.u <- delta.p*sum(p*y_unifpost)
+abline(v=p.mean.b, col='green',lty=2)
+abline(v=p.mean.u, col='blue',lty=2)
+text(x = p.mean.b + 0.07, y = max(y_betapost) + 0.2, labels = paste('beta posterior\n mean:', round(p.mean.b, 3)), col = "darkgreen", cex = 0.5)
+text(x = p.mean.u - 0.07, y = max(y_unifpost) + 0.2, labels = paste('uniform posterior\n mean:', round(p.mean.u, 3)), col = "navy", cex = 0.5)
+
+```
+
+#### (b) Most probable value for $p$ and 95% crediblity interval
+
+From the above plot it can be inferred that the most probable value for the probability $p$ of obtaining tails is given by the mean of the posterior distribution. This depends on the specific prior that was chosen. With the uniform prior, the coin is deduced to be perfectly fair ($p=0.5$), while by assuming the beta prior one introduces a bias ($p=0.516$).
+
+In order to compute the desired credibility interval, a numerical method can be employed, as in the previous Exercise 2(e).
+
+
+```{r, echo=TRUE}
+unif_integral_to_a <- function(a) {
+  integrate(unif_posterior, lower = 0, upper = a)$value
+}
+
+beta_integral_to_a <- function(a) {
+  integrate(beta_posterior, lower = 0, upper = a)$value
+}
+
+
+unif_find_a <- function(target) {
+  to_solve <- function(a) {
+    unif_integral_to_a(a) - target
+  }
+  result <- uniroot(to_solve, lower = 0, upper = 1)
+  return(result$root)
+}
+
+beta_find_a <- function(target) {
+  to_solve <- function(a) {
+    beta_integral_to_a(a) - target
+  }
+  result <- uniroot(to_solve, lower = 0, upper = 1)
+  return(result$root)
+}
+
+a_unif <- unif_find_a(0.025)
+b_unif <- unif_find_a(0.975)
+a_beta <- beta_find_a(0.025)
+b_beta <- beta_find_a(0.975)
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+y_unifpost <- sapply(p, unif_posterior)
+y_betapost <- sapply(p, beta_posterior)
+
+plot(p, y_unifpost , type="l", lwd=1.5, col='purple3', xlim=c(0,1), ylim=c(0,max(c(y_unifpost, y_betapost))+0.5), xaxs="i", yaxs="i", xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')))
+lines(p, y_betapost , type="l", lwd=1.5, col='green3')
+
+x_red_b <- p[p >= a_beta & p <= b_beta]
+y_red_b <- y_betapost[p >= a_beta & p <= b_beta]
+polygon(c(a_beta, a_beta, x_red_b, b_beta, b_beta), c(0, 0.12, y_red_b, 0.09, 0), col = rgb(0/255, 255/255, 0/255, 0.5), border = NA)
+
+x_red_u <- p[p >= a_unif & p <= b_unif]
+y_red_u <- y_unifpost[p >= a_unif & p <= b_unif]
+polygon(c(a_unif, a_unif, x_red_u, b_unif, b_unif), c(0, 0.12, y_red_u, 0.09, 0), col = rgb(100/255, 50/255, 200/255, 0.5), border = NA)
+
+legend("topright",
+       legend=c("uniform prior", paste("95% c.i. [", signif(a_unif, 4), ",", signif(b_unif,4), "]"), "beta prior",  paste("95% c.i. [", signif(a_beta, 4), ",", signif(b_beta,4), "]")),
+       col=c("purple3", rgb(100/255, 50/255, 200/255, 0.5), "green3", rgb(0/255, 255/255, 0/255, 0.5)),
+       lwd=c(1.5, 10, 1.5, 10), cex=0.8
+       )
+title(main="95% credibility intervals of posterior distributions")
+
+```
+
+#### (c) Sequential analysis of the data.
+
+```{r}
+
+tosses <- c('T', 'T', 'T', 'T', 'T', 'H', 'T', 'T', 'H', 'H', 'T', 'T', 'H', 'H', 'H', 'T', 'H', 'T', 'H', 'T', 'H', 'H', 'T', 'H', 'T', 'H', 'T', 'H', 'H', 'H')
+binary_tosses <- ifelse(tosses == 'T', 1, 0)
+
+n_seq <- c(1:length(tosses))
+r_seq <- cumsum(binary_tosses)
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+
+mean_values_unif <- numeric(length(tosses))
+ci_upper_unif <- numeric(length(tosses))
+ci_lower_unif <- numeric(length(tosses))
+
+mean_values_beta <- numeric(length(tosses))
+ci_upper_beta <- numeric(length(tosses))
+ci_lower_beta <- numeric(length(tosses))
+
+for (n in n_seq) {
+  r <- r_seq[n]
+  
+  unif_posterior <- function(p) {
+    return(dbeta(p, r+1, n-r+1))
+  }
+  
+  beta_posterior <- function(p) {
+    return(dbeta(p, r+alpha, n-r+beta))
+  }
+  
+  unif_integral_to_a <- function(a) {
+    integrate(unif_posterior, lower = 0, upper = a)$value
+  }
+  
+  beta_integral_to_a <- function(a) {
+    integrate(beta_posterior, lower = 0, upper = a)$value
+  }
+  
+  
+  unif_find_a <- function(target) {
+    to_solve <- function(a) {
+      unif_integral_to_a(a) - target
+    }
+    result <- uniroot(to_solve, lower = 0, upper = 1)
+    return(result$root)
+  }
+  
+  beta_find_a <- function(target) {
+    to_solve <- function(a) {
+      beta_integral_to_a(a) - target
+    }
+    result <- uniroot(to_solve, lower = 0, upper = 1)
+    return(result$root)
+  }
+  
+  ci_lower_unif[n] <- unif_find_a(0.025)
+  ci_upper_unif[n] <- unif_find_a(0.975)
+  ci_lower_beta[n] <- beta_find_a(0.025)
+  ci_upper_beta[n] <- beta_find_a(0.975)
+  
+  mean_values_beta[n] <- (r+1)/(n+2)
+  mean_values_unif[n] <- (r+alpha)/(n+alpha+beta)
+}
+
+```
+
+```{r, echo=TRUE, fig.width=8, fig.height=4}
+par(mfrow=c(1, 2))
+
+plot(n_seq, mean_values_unif, type='l', col='purple3', lwd=1.5, ylim=c(0,1), lty=1, xlab='Number of tosses', ylab='Probability of Tails', main='Uniform prior')
+polygon(c(n_seq, rev(n_seq)), c(ci_upper_unif, rev(ci_lower_unif)), col=rgb(100/255, 50/255, 200/255, 0.5), border=FALSE)
+abline(h=p.mean.u, col='navy', lty=2, lwd=1.5)
+legend('bottomright', legend=c('Mean value', '95% c.i.', 'Whole-dataset mean'), col=c('purple3', rgb(100/255, 50/255, 200/255, 0.5), 'navy'), lwd=c(1.5, 10, 1.5), cex=0.7, lty=c(1,1,2))
+
+
+plot(n_seq, mean_values_beta, type='l', col='green4', lwd=1.5, ylim=c(0,1), lty=1, xlab='Number of tosses', ylab='Probability of Tails', main='Beta prior')
+polygon(c(n_seq, rev(n_seq)), c(ci_upper_beta, rev(ci_lower_beta)), col=rgb(0/255, 255/255, 0/255, 0.5), border=FALSE)
+abline(h=p.mean.b, col='darkgreen', lty=2, lwd=1.5)
+legend('bottomright', legend=c('Mean value', '95% c.i.', 'Whole-dataset mean'), col=c('green4', rgb(0/255, 255/255, 0/255, 0.5), 'darkgreen'), lwd=c(1.5, 10, 1.5), cex=0.7, lty=c(1,1,2))
+
+```
+
+#### (d)
+
+It can be observed by the previous plot that a sequential analysis gives the same result with respect to a whole-dataset analysis.
+
+
+## Exercise 4 - Poll
+
+A couple of days before an election in which four parties (A,B,C,D) compete, a poll is taken using a sample of 200 voters who express the following preferences 57, 31, 45 and 67 for, respectively, parties A,B,C and D. Using a Bayesian approach, for all parties
+
+-   Calculate the expected percentage of votes and a 68% credibility interval by assuming as prior a
+
+    -   uniform prior
+
+    -   a prior constructed from the results obtained from another poll conducted the previous week on a sample of 100 voters who expressed the following preferences 32,14,26,28 for, respectively, parties A,B,C and D.
+
+-   Sample size to obtain a margin of error less or equal than ±3% for each party
+
+### Solution
+
+#### (a) Expected percentages and credibility intervals
+
+This problem can be modeled by a multinomial distribution, so that labeling the disjoint outcomes $A_1$, $A_2$, $A_3$, $A_4$ (corresponding to a vote for each different party), $P(A_j) = p_j$ is the probability of a vote occurring. Moreover, in this problem there are $n=200$ independent trials, where $n = \sum_{j=1...4} x_j$ and $x_j$ is the number of votes for each party, i.e. $\{x_1, x_2, x_3, x_4 \} =\{57, 31, 45, 67 \}$. We have then a multinomial likelihood, of the type
+
+$$
+P(X_1=x_1, X_2=x_2, X_3=x_3, X_4=x_4|p_1, p_2, p_3, p_4, n) = \frac{n!}{x_1!\ x_2!\ x_3!\ x_4!} \ p_1^{x_1}\ p_2^{x_2}\ p_3^{x_3}\ p_4^{x_4}
+$$
+The properties of the multinomial distribution are the following:
+
+$$
+E[x_j] = n\ p_j \qquad Var(x_j)=n\ p_j\ (1-p_j) \qquad Cov(x_i, x_j) = -n\ p_i\ p_j
+$$
+and moreover, when n becomes large, the distribution tends to a multinormal distribution.
+
+##### Uniform prior
+
+Taking into account the experimental data and a uniform prior, i.e. $\{p_j\}_{j=1...4}=\{\frac{1}{4}, \frac{1}{4}, \frac{1}{4}, \frac{1}{4} \}$, the posterior is a 4-dimensional Beta distribution where for each variable we take $Beta(r+\alpha, n-r+\beta) = Beta(r+1, 200-r+1)$, $r \in \{x_j\}$.
+
+```{r, echo=TRUE}
+plot_ex4 <- function(xjs, alpha, beta){
+  y <- list()
+  means <- numeric(length(xjs))
+  cis <- list()
+  cf <- 0.68
+  p_reds <- list()
+  y_reds <- list()
+  n <- sum(xjs)
+    
+  for (i in 1:length(xjs)){
+    y[[i]] <- dbeta(p, xjs[i]+alpha, n-xjs[i]+beta)
+    means[i] <- (xjs[i]+alpha)/(n+alpha+beta)
+    cis[[i]] <- qbeta(c((1-cf)/2, cf + (1-cf)/2), xjs[i]+alpha, n-xjs[i]+beta)
+    p_reds[[i]] <- p[p>=cis[[i]][1] & p<=cis[[i]][2]]
+    y_reds[[i]] <- y[[i]][p>=cis[[i]][1] & p<=cis[[i]][2]]
+  }
+  
+  max_value <- max(y[[2]])+0.5
+  
+  colors <- c(rgb(255/255, 130/255, 171/255, 0.5), 'red3', 'darkred', rgb(130/255, 200/255, 255/255, 0.5), 'blue', 'navy', rgb(100/255, 50/255, 200/255, 0.5), 'purple', 'purple4', rgb(0/255, 255/255, 0/255, 0.5), 'green3', 'darkgreen')
+    
+  labels <- c(paste("party A 68% c.i. [", 100*signif(cis[[1]][1], 3), ',', 100*signif(cis[[1]][2], 3), ']'),
+              "party A posterior", paste("party A mean", 100*signif(means[1], 3)),
+              paste("party B 68% c.i. [", 100*signif(cis[[2]][1], 3), ',', 100*signif(cis[[2]][2], 3), ']'),
+              "party B posterior", paste("party B mean", 100*signif(means[2], 3)),
+              paste("party C 68% c.i. [", 100*signif(cis[[3]][1], 3), ',', 100*signif(cis[[3]][2], 3), ']'),
+              "party C posterior", paste("party C mean", 100*signif(means[3], 3)),
+              paste("party D 68% c.i. [", 100*signif(cis[[4]][1], 3), ',', 100*signif(cis[[4]][2], 3), ']'),
+              "party D posterior", paste("party D mean", 100*signif(means[4], 3)))
+  lwds <- c(rep(c(10, 1.5, 1.5), 4))
+  ltys <- c(rep(c(1, 1, 2), 4))
+  
+  plot(p, p, type="l", lwd=1.5, col='white', xlim=c(0,100), ylim=c(0,max_value), xaxs="i", yaxs="i", xlab='Expected percentage of votes', ylab=expression(paste('Posterior pdf')))
+  
+  for (i in 1:length(xjs)){
+    polygon(100*c(cis[[i]][1], p_reds[[i]], cis[[i]][2]), c(0, y_reds[[i]], 0), col=colors[1+(length(xjs)-1)*(i-1)], border=FALSE)
+    lines(100*p, y[[i]] , type="l", lwd=1.5, col=colors[2+(length(xjs)-1)*(i-1)], lty=1)
+    abline(v=100*means[i], lty=2, col=colors[3+(length(xjs)-1)*(i-1)], lwd=1.5)
+  }
+  
+  legend("topright", legend=labels, col=colors, lwd=lwds, lty=ltys, cex=0.8)
+  return(list(y, means, cis))
+}
+```
+
+```{r}
+xjs <- c(57, 31, 45, 67)
+
+alpha <- 1
+beta <- 1
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+
+unif_data <- plot_ex4(xjs, alpha, beta)
+title(main='Posterior pdfs for the election results, uniform prior')
+```
+
+##### Custom prior
+
+```{r}
+xjs_prev <- c(32, 14, 26, 28)
+
+custom_data <- plot_ex4(xjs + xjs_prev, alpha, beta)
+title(main='Posterior pdfs for the election results, custom prior')
+
+```
+
+#### (b) Sample size to obtain a margin of error less or equal than ±3% for each party
+
+For a sample proportion $p$ with sample size $n$, the margin of error can be calculated as $m.o.e. = \frac{1}{Z} \sqrt{\frac{p(1-p)}{n}}$ where $Z$ is the Z-score corresponding to the desired confidence level, in this case 68% for which $Z \approx 1$. Indeed, $n \geq \frac{p(1-p)}{0.03^2}$. Inserting in this equation the 4 possible values for p, obtained as $E[p]$ from the previous analysis, one gets the following.
+
+```{r}
+n_unif <- ceiling(max(unif_data[[2]]*(1-unif_data[[2]])/(0.03^2)))
+n_cust <- ceiling(max(custom_data[[2]]*(1-custom_data[[2]])/(0.03^2)))
+
+print(paste('The necessary sample size to obtain a margin of error less or equal than ±3% for each party is', n_unif, 'with the uniform prior and', n_cust, 'with the custom beta prior.'))
+
+```
