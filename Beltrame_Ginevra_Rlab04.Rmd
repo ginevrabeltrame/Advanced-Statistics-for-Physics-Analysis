@@ -1,0 +1,376 @@
+---
+title: "Beltrame_Ginevra_Rlab04"
+output: html_document
+date: "2024-06-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercise 1: Bayesian Inference for Poisson model
+
+-   a well established and diffused method for detecting a disease in blood fails to detect the presence of disease in 15% of the patients that actually have the disease.
+
+-   A young UniPD startUp has developed an innovative method of screening. During the qualification phase, a random sample of $n = 75$ patients known to have the disease is screened using the new method.
+
+(a) What is the probability distribution of $y$, the number of times the new method fails to detect the disease?
+(b) On the $n = 75$ patients sample, the new method fails to detect the disease in $y = 6$ cases. What is the frequentist estimator of the failure probability of the new method?
+(c) Setup a bayesian computation of the posterior probability, assuming a beta distribution with mean value 0.15 and standard deviation 0.14. Plot the posterior distribution for $y$, and mark on the plot the mean value and variance
+(d) Perform a test of hypothesis assuming that if the probability of failing to the detect the disease in ill patients is greater or equal than 15%, the new test is no better that the traditional method. Test the sample at a 5% level of significance in the Bayesian way.
+(e) Perform the same hypothesis test in the classical frequentist way.
+
+### Solution
+
+#### (a) Uniform prior
+
+By formulating the problem in terms of a Hypothesis Testing paradigm, we can define as the null hypothesis $H_0$ the statement "The patient has the disease". It follows that the situation in which the patient indeed has the disease ($H_0$ is true) but the test rejects the null hypothesis is a type I error. It is moreover said that the well-established test has a false negative rate of $\alpha = 0.15$, resulting in a sensitivity of 85%.
+
+Assuming each test to be an independent Bernoulli trial with a probability of $\alpha'$ for a false negative result, then the number of false negatives $y$ in $n=75$ tests follows a Binomial distribution:
+
+$$
+P(y) = \binom{n}{y} \alpha'^y (1 - \alpha')^{n - y}
+$$
+
+#### (b) Frequentist estimator of the failure probability
+
+In a frequentist approach, an unbiased estimator for the Binomial distribution is $p_F = \frac{y}{n} = \frac{6}{75} = 0.08$.
+
+#### (c) Bayesian computation of the posterior probability
+
+Assuming a beta distribution with
+
+$$
+E[x] = \frac{\alpha}{\alpha + \beta} = 0.15; \qquad Var(x) = \frac{αβ}{(α + β)^2(α + β + 1)} = 0.14^2 = 0.0196 \\
+\text{which results in} \\
+\alpha = \frac{E[x]^2(1-E[x])}{Var(x)} - E[x] = 0.8258; \qquad \beta = \frac{1-E[x]}{E[x]}; \quad \alpha = \frac{E[x](1-E[x])^2}{Var(x)} - (1-E[x]) = 4.6793
+$$
+
+It follows that the desired Beta prior is $Beta(\alpha, \beta) = Beta(0.8258, 4.6793)$. The posterior pdf is then obtained by multiplying it by the likelihood, as in the following, where $n=75$ and $y=6$.
+
+$$
+P(\pi | y,n,H) = \frac{1}{B(y + α, n − y + β)
+} \pi^{y+\alpha-1} (1-\pi)^{n-y+\beta-1} = Beta(y + α, n − y + β) = Beta(6.8258, 73.6793)
+$$
+
+The mean and variance are therefore calculated as in the following.
+
+$$
+E[x] = \frac{\alpha}{\alpha + \beta} = 0.0848 \qquad Var(x) = \frac{αβ}{(α + β)^2(α + β + 1)} = 0.0010
+$$
+
+The obtained distribution is that of the probability variable $\pi$. To extract a pdf for $y$, we must sample from this distribution and then display the histogram of $y$ values which follow a standard binomial distribution.
+
+```{r}
+n <- 75
+y <- 6
+mu <- 0.15
+sigma <- 0.14
+alpha <- mu^2 * (1-mu) / sigma^2 - mu
+beta <- alpha * (1-mu)/mu
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+
+Pi_posterior <- function(x) {
+  return(dbeta(x, y+alpha, n-y+beta))
+}
+
+pi_values <- sapply(p, Pi_posterior)
+
+plot(p, pi_values , type="l", lwd=2, col='blue', xlim=c(0,1), ylim=c(0,max(pi_values)+1), xaxs="i", yaxs="i", xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')))
+
+title(main="Posterior probability density function", line=0.3, cex.main=1.2)
+p.mean <- (y+alpha) /(n+alpha+beta)
+abline(v=p.mean , lty=2, col='red3', lwd=1.5)
+
+p.variance <- (alpha+y)*(n+alpha+beta)/((n+alpha+beta)^2*(n+alpha+beta+1))
+
+abline(v=p.mean - sqrt(p.variance) , lty=2, col='navy', lwd=1.5)
+abline(v=p.mean + sqrt(p.variance) , lty=2, col='navy', lwd=1.5)
+
+legend('topright', legend=c('pdf', paste('mean:', round(p.mean, 3)), paste('1-sigma interval: [', round(p.mean - sqrt(p.variance), 3), ',', round(p.mean + sqrt(p.variance), 3), ']'), paste('variance:', round(p.variance, 5))), col=c('blue', 'red3', 'navy', ' white'), lty=c(1, 2, 2, 1), lwd=c(2, 1.5, 1.5, 1), cex=0.7)
+
+```
+
+#### (d) Bayesian Hypothesis testing
+
+Perform a test of hypothesis assuming that if the probability of failing to the detect the disease in ill patients is greater or equal than 15%, the new test is no better than the traditional method. Test the sample at a 5% level of significance in the Bayesian way.
+
+To set up the hypothesis test, we first define the null hypothesis to be $H_0: p_{fail} \geq p_0$ with \$p\_{fail} = \pi \$ and $p_0 = 0.15$. The level of significance is set at $\alpha = 0.05$, and this is a one-side HT.
+
+```{r, echo=TRUE}
+n <- 75
+y <- 6
+mu <- 0.15
+sigma <- 0.14
+alpha <- mu^2 * (1-mu) / sigma^2 - mu
+beta <- alpha * (1-mu)/mu
+
+n.sample <- 2000
+delta.p <- 1/n.sample
+
+p <- seq(from=1/(2*n.sample), by=1/n.sample , length.out=n.sample)
+
+Pi_posterior <- function(x) {
+  return(dbeta(x, y+alpha, n-y+beta))
+}
+
+pi_values <- sapply(p, Pi_posterior)
+
+plot(p, pi_values , type="l", lwd=2, col='blue', xlim=c(0,1), ylim=c(0,max(pi_values)+1), xaxs="i", yaxs="i", xlab=expression(pi), ylab=expression(paste('P(', pi, '| r,n,H)')))
+
+title(main="Posterior probability density function", line=0.3, cex.main=1.2)
+p.mean <- (y+alpha) /(n+alpha+beta)
+abline(v=p.mean , lty=3, col='navy', lwd=1.5)
+
+sig_lev <- 0.05
+
+p0 <- 0.15
+abline(v=p0, col='red3', lty=2, lwd=1.5)
+
+p_red <- p[p>=p0]
+y_red <- pi_values[p>=p0]
+polygon(c(p0, p_red), c(0, y_red), col=rgb(130/255, 200/255, 255/255, 0.5), border=FALSE)
+
+integral_from_p0 <- function(sig_lev) {
+  return(integrate(Pi_posterior, lower = p0, upper = 1)$value)
+}
+
+labels <- c('pdf', paste('mean:', round(p.mean, 3)), paste('p0 =', p0), 'Rejection area')
+colors <- c('blue', 'navy', 'red3', rgb(130/255, 200/255, 255/255, 0.5)) 
+ltys <- c(1, 3, 2, 1) 
+lwds <- c(2, 1.5, 1.5, 10)
+
+legend('topright', legend=labels, col=colors, lty=ltys, lwd=lwds, cex=0.8)
+text(x=0.6, y=6, labels=paste('The integral of the rejection area is', signif(integral_from_p0(sig_lev), 3), '< 0.05, \ntherefore H0 is rejected with confidence level 95%.'), cex=0.8)
+
+```
+
+#### (e) Frequentist Hypothesis testing
+
+```{r}
+y <- 6; n <- 75; p0 <- 0.15
+freq_test <- binom.test(y, n, p0, alternative = 'less')
+freq_test
+
+ys <- 0:10
+barplot(pbinom(ys, n, p0), col='lightblue', xlab='y', ylab='F(y)', width = 1, space = 0)
+abline(h=freq_test$p.value, col='red3', lty=2)
+text(2, freq_test$p.value*1.2, paste('pvalue:', signif(freq_test$p.value, 3)), cex=0.8, col='red3')
+axis(1, at = 0:10 + 0.5, labels=0:10)
+polygon(c(-0.5, 11.5, 11.5, -0.5), c(freq_test$conf.int[1], freq_test$conf.int[1], freq_test$conf.int[2], freq_test$conf.int[2]), col=rgb(0, 0, 0, 0.15), border=FALSE)
+abline(h=c(freq_test$conf.int[1], freq_test$conf.int[2]), col='black', lty=2)
+
+text(3, 0.3, paste('H0 cannot be rejected by this test as the p0 lies\n within the 95% confidence level [', signif(freq_test$conf.int[1], 3), ',', signif(freq_test$conf.int[2], 3), '].'), cex=0.8)
+```
+
+## Exercise 2
+
+-   a researcher has collected $n = 16$ observations that are supposed to come from a Normal distribution with known variance $σ^2 = 4$:
+
+    |      |      |      |      |      |      |      |      |
+    |------|------|------|------|------|------|------|------|
+    | 4.09 | 4.68 | 1.87 | 2.62 | 5.58 | 8.68 | 4.07 | 4.78 |
+    | 4.79 | 4.49 | 5.85 | 5.09 | 2.40 | 6.27 | 6.30 | 4.47 |
+
+-   assuming the prior is a step function:
+
+$$
+g(\mu) = \begin{cases}
+         \mu & \text{for } 0 < \mu \leq 3 \\
+         3 & \text{for } 3 < \mu ≤ 5 \\
+         8 − \mu & \text{for } 5 < \mu ≤ 8 \\
+         0 & \text{for } \mu > 8
+         \end{cases}
+$$
+
+(a) find the posterior distribution, the posterior mean and standard deviation
+(b) find the 95% credibility interval for µ
+(c) plot the posterior distribution, indicating on the same plot: the mean value, the standard deviation, and the 95% credibility interval
+(d) plot, on the same graph, the prior, the likelihood and the posterior distribution
+
+### Solution
+
+From Bayes’ theorem, and assuming the Likelihood $P(D|\mu, \sigma)$ follows a Guassian distribution and that all the collected data points are independent,
+
+$$
+P(\mu | D, \sigma) \propto P(D | \mu, \sigma) \cdot P(\mu | \sigma) = \prod_j \frac{1}{\sqrt{2\pi\sigma^2}} \ e^{-\frac{(y_j - \mu)^2}{2\sigma^2}} \ P(\mu | \sigma)
+$$
+
+Moreover, the prior distribution $P(\mu) = P(\mu | \sigma)$ is the given step function, so the posterior can be calculated (apart from a normalizing factor) as in the following.
+
+$$
+P(\mu | D, \sigma) \propto \begin{cases}
+         \prod_j \frac{\mu}{\sqrt{2\pi\sigma^2}} \ e^{-\frac{(y_j - \mu)^2}{2\sigma^2}} & \text{for } 0 < \mu \leq 3 \\
+         \prod_j \frac{3}{\sqrt{2\pi\sigma^2}} \ e^{-\frac{(y_j - \mu)^2}{2\sigma^2}} & \text{for } 3 < \mu ≤ 5 \\
+         \prod_j \frac{8-\mu}{\sqrt{2\pi\sigma^2}} \ e^{-\frac{(y_j - \mu)^2}{2\sigma^2}} & \text{for } 5 < \mu ≤ 8 \\
+         0 & \text{for } \mu > 8
+         \end{cases}
+$$
+
+Specifically, the variance is known $\sigma^2 = 4$ and so are the data points $\{y_j\}_{j=1...n} = \{4.09, 4.68, 1.87, 2.62, 5.58, 8.68, 4.07, 4.78, 4.79, 4.49, 5.85, 5.09, 2.40, 6.27, 6.30, 4.47\}$ with $n=16$. The posterior distribution can therefore be computed analytically, and subsequantly plotted as a function of the sole $\mu$.
+
+$$
+P(D|\mu, \sigma) = \prod_j \frac{1}{\sqrt{2\pi\sigma^2}} \ e^{-\frac{(y_j - \mu)^2}{2\sigma^2}} = \frac{e^{-\frac{\sum_j (y_j - \mu)^2}{2\sigma^2}}}{\sqrt{2\pi\sigma^2}} = \frac{e^{-\frac{\sum_j (y_j^2 - 2y_j\mu + \mu^2)}{2\sigma^2}}}{\sqrt{2\pi\sigma^2}} = \frac{e^{-\frac{\sum_j y_j^2 - 2\mu \sum_jy_j + n\mu^2}{2\sigma^2}}}{\sqrt{2\pi\sigma^2}} = \frac{e^{-\frac{( A - 2\mu B + n\mu^2)}{2\sigma^2}}}{\sqrt{2\pi\sigma^2}} \\
+\text{with} \quad n= 16, \quad  A=\sum_j y_j^2=402.8625, \quad B=\sum_j y_j=76.03, \quad \sigma=2 \\
+\text{therefore} \quad P(D|\mu, \sigma) = \frac{e^{-\frac{( A - 2\mu B + 16\mu^2)}{8}}}{2\sqrt{\pi}} = \frac{e^{-\frac{A}{8} + \frac{B}{4}\mu - 2\mu^2}}{2\sqrt{\pi}} \quad \text{and} \\
+P(\mu | D, \sigma) \propto \begin{cases}
+         \frac{\mu}{2\sqrt{\pi}}e^{-\frac{A}{8} + \frac{B}{4}\mu - 2\mu^2} & \text{for } 0 < \mu \leq 3 \\
+         \frac{3}{2\sqrt{\pi}}e^{-\frac{A}{8} + \frac{B}{4}\mu - 2\mu^2} & \text{for } 3 < \mu ≤ 5 \\
+         \frac{8-\mu}{2\sqrt{\pi}}e^{-\frac{A}{8} + \frac{B}{4}\mu - 2\mu^2} & \text{for } 5 < \mu ≤ 8 \\
+         0 & \text{for } \mu > 8
+         \end{cases}
+$$
+
+I can now plot the function and infer the mean, standard deviation and 95% credibility interval.
+
+```{r echo=TRUE, fig.height=5, fig.width=10}
+y <- c(4.09, 4.68, 1.87, 2.62, 5.58, 8.68, 4.07, 4.78, 4.79, 4.49, 5.85, 5.09, 2.40, 6.27, 6.30, 4.47)
+n <- length(y)
+sigma <- 4
+
+likelihood_function_unnorm <- function(mu){
+  return(prod(dnorm(y, mu, sigma)))
+}
+likelihood_vec_unnorm <- Vectorize(likelihood_function_unnorm, c('mu'))
+L_norm <- integrate(likelihood_vec_unnorm, 0, 10)$value
+
+likelihood_function_norm <- function(mu){
+  return(prod(dnorm(y, mu, sigma))/L_norm)
+}
+likelihood_function <- Vectorize(likelihood_function_norm, c('mu'))
+
+prior_function <- function(mu) {
+  if (mu > 0 & mu <= 3)     { return(mu) }
+  else if (mu > 3 & mu <= 5){ return(3) }
+  if (mu > 5 & mu <= 8)     { return(8 - mu) }
+  else                      { return(0) }
+}
+
+prior_vec <- Vectorize(prior_function, c('mu'))
+
+posterior_function_unnorm <- function(mu) {
+  return(likelihood_function(mu)*prior_vec(mu))
+}
+
+posterior_norm <- integrate(posterior_function_unnorm, 0, 10)$value
+
+posterior_function <- function(mu) {
+  return(posterior_function_unnorm(mu)/posterior_norm)
+}
+
+mu_step <- 0.05
+mu_values <- seq(0, 10, mu_step)
+likelihood_values <- sapply(mu_values, likelihood_function)
+prior_values <- sapply(mu_values, prior_function)
+posterior_values <- sapply(mu_values, posterior_function)
+
+par(mfrow=c(1,2))
+
+plot(mu_values, mu_values, col='white', xlab=expression(mu), ylim=c(0,0.5), ylab='Normalized function')
+lines(mu_values, likelihood_values, col='red', lty=1, lwd=1.5)
+lines(mu_values, prior_values/15, col='green3', lty=1, lwd=1.5)
+lines(mu_values, posterior_values, col='blue', lty=1, lwd=1.5)
+legend('topright', col=c('red', 'green3', 'blue'), legend=c('likelihood', 'prior', 'posterior'), lty=1, lwd=1.5)
+
+post_mean <- sum(mu_values*posterior_values*mu_step)
+post_var <- sum(mu_values^2 *posterior_values*mu_step) - post_mean^2
+
+cf <- 0.95
+cf_upper <- cf + (1-cf)/2 
+cf_lower <- (1-cf)/2
+
+# Define the integral function from 0 to a
+integral_to_a <- function(a) {
+  integrate(posterior_function, lower = 0, upper = a)$value
+}
+
+# Define the function to solve the equation
+find_a <- function(target) {
+  to_solve <- function(a) {
+    integral_to_a(a) - target
+  }
+  result <- uniroot(to_solve, lower = 0, upper = 10)
+  return(result$root)
+}
+
+# Find a such that the integral equals 0.025
+a_value <- find_a(cf_lower)
+b_value <- find_a(cf_upper)
+
+mu_red <- mu_values[mu_values >= a_value & mu_values <= b_value]
+posterior_red <- posterior_values[mu_values >= a_value & mu_values <= b_value]
+
+plot(mu_values, mu_values, col='white', xlab=expression(mu), ylim=c(0,0.5), ylab='Posterior')
+polygon(c(a_value, mu_red, b_value), c(0, posterior_red, 0), col=rgb(130/255, 200/255, 255/255, 0.5), border=FALSE)
+lines(mu_values, posterior_values, col='blue', lty=1, lwd=1.5)
+abline(v=post_mean, col='navy', lwd=1.5, lty=2)
+abline(v=post_mean-sqrt(post_var), col='navy', lwd=1.5, lty=3)
+abline(v=post_mean+sqrt(post_var), col='navy', lwd=1.5, lty=3)
+
+leg.colors <- c('blue', 'navy', 'navy', rgb(130/255, 200/255, 255/255, 0.5))
+leg.labels <- c('posterior pdf', paste('mean:', signif(post_mean,3)), paste('1-sigma interval:[', signif(post_mean-sqrt(post_var), 3), ',', signif(post_mean+sqrt(post_var), 3), ']'), paste('95% c.i.:[', signif(a_value, 3), ',', signif(b_value, 3), ']'))
+leg.lwd <- c(1.5, 1.5, 1.5, 10)
+leg.lty <- c(1, 2, 3, 1)
+legend('topright', legend=leg.labels, col=leg.colors, lwd=leg.lwd, lty=leg.lty, cex=0.625)
+
+```
+
+## Exercise 3 - Six Boxes Toy Model : inference
+
+Labeling the boxes H0 H1 H2 H3 H4 H5, write a program in R that:
+
+1.  selects a random box
+
+2.  makes random sampling from the box
+
+3.  prints on the standard output the probability of selecting each box
+
+4.  plots the probability for each box as a function of the number of trial
+
+### Solution
+
+```{r}
+# White is 1, Black is 0
+boxes <- list(rep(0, 5), c(rep(0, 4), 1), c(rep(0, 3), rep(1, 2)), c(rep(0, 2), rep(1, 3)), c(0, rep(1, 4)), rep(1, 5))
+
+set.seed(89540)
+n_extractions <- 20
+N_boxes <- 6
+prob_boxes <- matrix(NA, nrow = N_boxes, ncol = n_extractions)
+
+random_box_index <- 1
+whites_counter <- 0
+
+for (n in 1:n_extractions){
+  random_sampling_from_box <- sample(boxes[[random_box_index]], size=20, replace=TRUE)
+  whites_counter <- whites_counter + sample(boxes[[random_box_index]], size=1, replace=TRUE)
+  norms <- numeric(n_extractions)
+  
+  for (j in 1:N_boxes){
+    if (n==1){
+      prob_boxes[j, n] <- (5-(j-1))/5 * 1/5 *5/3
+    }
+    else {
+      norms[n] <- sum(prob_boxes[, n-1])
+      prob_boxes[j, n] <- prob_boxes[j, n-1] * (5-(j-1))/5 * 1/norms[n]
+    }
+  }
+}
+
+cat('The probabilities of having selected each box are, respectively,', signif(prob_boxes[,n_extractions],3))
+
+colors <- rainbow(N_boxes)
+plot(1:n_extractions, 1:n_extractions, type='p', pch=19, col='white', xlim=c(0,n_extractions), ylim=c(0,1), xlab='Number of extractions with replacement', ylab='Probability of box Hj')
+
+for (j in 1:N_boxes){
+  lines(0:n_extractions, c(0.2, prob_boxes[j, ]), col=colors[j], lwd=1)
+  points(0:n_extractions, c(0.2, prob_boxes[j, ]), pch=20, col=colors[j])
+}
+
+legend('topright', col=colors, legend=c('H0', 'H1', 'H2', 'H3', 'H4', 'H5'), pch=20)
+```
+

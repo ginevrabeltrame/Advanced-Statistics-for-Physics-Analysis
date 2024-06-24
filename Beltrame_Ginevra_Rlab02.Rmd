@@ -1,0 +1,380 @@
+---
+title: "Beltrame_Ginevra_Rlab02"
+output: html_document
+date: "2024-04-16"
+---
+
+## Exercise 1 - Discrete random variable
+
+The probability distribution function of a discrete variable k is given by the zero-truncated Poisson distribution.
+
+### Part 1) Write the R functions for the probability density and cumulative distribution functions, using the R naming convention.
+
+```{r}
+x_max <- 15
+x <- 1:x_max
+lambda <- 1.4
+pdf_function <- dpois(x, lambda)  # naming convention: use the letter d for the pdf
+cdf_function <- ppois(x, lambda)  # and p for the cdf
+```
+
+### Part 2) Produce two plots showing the pdf and cdf, separately.
+
+```{r,fig.width=8, fig.height=4}
+par(mfrow = c(1, 2))
+
+barplot(pdf_function, col = "lightblue", xlab='x', xlim=c(0,x_max), ylim=c(0,1), ylab='f(x)', main = sprintf("Poisson pdf lambda=%.2f",lambda), width=rep(0.83, x_max))
+lines(x-rep(0.5, x_max), pdf_function, col="blue", lw=2)
+xticks <- seq(0.5, x_max-0.5, 1)
+xticklabels <- seq(1, x_max, 1)
+axis(side = 1, at = xticks, labels = xticklabels, las = 2)
+
+barplot(cdf_function, col = "pink", xlab='x', ylab='f(x)', xlim=c(0,x_max), ylim=c(0,1), main = sprintf("Poisson cdf lambda=%.2f",lambda), width=rep(0.83, x_max))
+lines(x-rep(0.5, x_max), cdf_function, col="red", lw=2)
+xticks <- seq(0.5, x_max-0.5, 1)
+xticklabels <- seq(1, x_max, 1)
+axis(side = 1, at = xticks, labels = xticklabels, las = 2)
+
+par(mfrow = c(1, 1))
+```
+
+### Part 3) Compute the mean value and variance of the probability distribution using R.
+
+```{r}
+mean_pdf <- mean(pdf_function)
+var_pdf <- var(pdf_function)
+
+print(paste('The mean of the pdf is', round(mean_pdf, digits=2), 'while the variance is', round(var_pdf, digits=2),'.'))
+```
+
+### Part 4) Generate a sample of random numbers from this distribution and show them in an histogram. Evaluate the sample mean.
+
+```{r}
+N_samples <- 1000000
+samples <- sample(x, N_samples, replace=TRUE, prob=pdf_function)
+
+hist(samples, breaks = seq(min(samples), max(samples), 1), main='Distribution of random samples from the pdf', 
+     xlab='Values', ylab='Counts', col='pink', axes=FALSE, xlim=c(min(samples)+0.2, max(samples)))
+xticks <- seq(1.5, max(samples)-0.5, 1)
+xticklabels <- seq(1, max(samples)-1, 1)
+axis(side = 1, at = xticks, labels = xticklabels, las = 2)
+axis(side = 2, at = pretty(0:N_samples*0.8), labels = TRUE, las = 1)
+lines(x+rep(0.5, x_max), N_samples*pdf_function, col="red", lw=2)
+
+
+abline(v = mean(samples), col = "black", lty = 2, lw = 1.5)
+legend("topright", legend = sprintf("Mean = %.3f", mean(samples)), col = "black", lty = 2, lw = 1.5)
+
+```
+
+## Exercise 2 - Continuous random variable
+
+### Part a) Compute the normalization factor N using R.
+
+```{r}
+E0 <- 7.25
+gamma <- 2.7
+
+p1 <- E0
+p2.integral <- integrate(function(E) {(E-E0+1)^(-gamma)}, lower=E0, upper=Inf)
+
+N <- 1/(p1 + p2.integral$value)
+
+print(paste("The normalization factor is N =", round(N, digits=3)))
+```
+
+### Part b) Plot the probability density function in R.
+
+```{r}
+pdf_function <- function(E) {
+  if (E < E0) {
+    return(N)
+  }
+  else {
+    return(N*(E - E0 + 1)^(-gamma))
+  }
+}
+
+step <- 0.01
+
+x <- seq(0, 2*E0, step)
+pdf_values <- sapply(x, pdf_function)
+
+plot(x, pdf_values, col='blue', type='l', xlab = "Energy (GeV)", ylab = "Probability density", main = "Probability density function")
+
+```
+
+### Part c) Plot the cumulative density function in R.
+
+```{r}
+cdf_function <- function(E) {
+  if (E == 0){
+    return(0)
+  }
+  else if (E <= E0) {
+    return(N*E)
+  }
+  else if (E > E0) {
+    return(E0*N + integrate(function(E) {N*(E - E0 + 1)^(-gamma)}, lower=E0, upper=E)$value)
+  }
+}
+
+cdf_values <- sapply(x, cdf_function)
+
+plot(x, cdf_values, col='blue', type='l', xlab = "Energy (GeV)", ylab = "Probability density", main = "Cumulative density function")
+```
+
+### Part d) Compute the mean value using R.
+
+```{r}
+
+mean_value <- sum(x*pdf_values*step)
+
+print(paste('The mean value is', signif(mean_value, 4)))
+```
+
+### Part e) [Optional] Generate $10^6$ random numbers from this distribution, show them in an histogram and superimpose the pdf (with a line or with a sufficient number of points).
+
+In order to sample from a custom distribution, we must first sample from a uniform distribution in the range $[0, 1]$ and then apply the inverse of the cumulative density function to the generated array. Given the cdf above, its inverse (icdf) is given by
+
+$$
+
+$$
+
+```{r}
+n_samples <- 10^6
+unif_sample <- runif(n_samples, 0, 1)
+
+icdf_function <- function(y) {
+  if (y < N*E0) {
+    return(y/N)
+  }
+  else if (y >= N*E0 & y<=1) {
+    return(((1-gamma)*(y/N - E0) + 1)^(1/(1-gamma)) + E0 - 1)
+  }
+}
+
+pdf_samples <- sapply(unif_sample, icdf_function)
+
+hist(pdf_samples, breaks=max(pdf_samples)*5, freq=FALSE, xlim=c(0,15), col='lightblue', xlab='Energy (GeV)', ylab='Probability density', main='Random sampling from pdf')
+lines(x, pdf_values, col='blue', lwd=2)
+```
+
+## Exercise 3 - Accidents at an intersection
+
+Suppose that the average number of accidents at an intersection is two per day.
+
+### Part a) Using Markov's inequality, find a bound for the probability that at least five accidents will occur tomorrow.
+
+$$
+P(X \geq k) \leq \frac{\mu}{k} \quad \forall \ k>0, \quad \text{where } X \text{ is a non-negative random variable with } E[x] = \mu
+$$
+
+```{r}
+mu <- 2
+k <- 5
+P_Markov <- mu/k
+print(paste("The bound is", P_Markov))
+```
+
+### Part b) Using Poisson random variables, calculate the probability that at least five accidents will occur tomorrow. Compare this value with the bound obtained in the previous point a).
+
+
+```{r}
+lambda <- 2
+t <- 1
+n_min <- 5
+P_Poisson_opposites <- numeric(n_min)
+
+for (n in 1:n_min) {
+  P_Poisson_opposites[n] <- (lambda*t)^(n-1) * exp(-lambda*t)/factorial(n-1)
+  # print(P_Poisson_opposites[n])
+}
+
+P_Poisson <- 1 - sum(P_Poisson_opposites)
+print(paste("The probability is", signif(P_Poisson, digits=3), "which is within the bound", P_Markov))
+```
+
+### Part c) Let the variance of the number of accidents be two per day. Using Chebyshev’s inequality, find a bound on the probability that tomorrow at least five accidents will occur.
+
+$$
+P(|X-\mu| \geq k) \leq \frac{\sigma^2}{k^2} \quad \forall \ k>0, \quad \text{where } X \text{ is a non-negative random variable with } E[x] = \mu \text{ and } Var(x)=\sigma
+$$
+
+```{r}
+variance <- 2
+mu <- 2
+X_target <- 5
+k <- X_target - mu
+P_Cheb <- variance/k^2
+print(paste("The bound according to Chebyshev's inequality is", signif(P_Cheb, 3)))
+```
+
+## Exercise 4 - Book ordering time
+
+The waiting period from the time a book is ordered until it is received is a random variable with mean seven days and standard deviation two days. If Helen wants to be 95% sure that she receives a book by certain date, how early should she order the book?
+
+```{r}
+mu <- 7
+sigma <- 2
+prob <- 0.95
+k_bound <- sigma/sqrt(1-prob) + mu
+days <- ceiling(k_bound)
+
+print(paste("Using Chebyshev's inequality, we find that Helen should order the book at least", days, "days earlier."))
+```
+
+## Exercise 5 - Deck of cards 
+
+An ordinary deck of 52 cards is divided randomly into 26 pairs. Using Chebyshev's inequality, find an upper bound for the probability that, at most, 10 pairs consist of a black and a red card.
+
+### Solution (1) - Hypergeometric distribution
+
+The probability distribution of the number of $(B, R)$ and $(R, B)$ pairs follows a hypergeometruc distribution, where we identify with $N=\binom{52}{2}=1326$ the total number of possible pairs and with $B=26\cdot26=676$ the number of different-colour pairs. Moreover, $n=26$ is the number of drawn samples.
+
+$$
+P(x|N,B,n) = \frac{\binom{B}{x} \binom{N-B}{n-x}}{\binom{N}{n}} \quad \text{with} \quad E[x]=\frac{nB}{N}, \ Var(x) = \frac{nB(N-B)}{N^2}(1-\frac{n-1}{N-1})
+$$
+
+```{r}
+n <- 26
+N <- 51*52/2
+B <- 26*26
+
+mu <- n*B/N
+v <- n*B*(N-B)/N^2 * (1 - (n-1)/(N-1))
+
+# Chebyshev's inequality
+X_target <- 10
+k <- X_target - mu
+P_Cheb <- v/k^2
+print(paste("The bound according to Chebyshev's inequality is", signif(P_Cheb, 3)))
+
+```
+
+### Solution (2) - Simulation
+
+```{r}
+deck <- c(rep(1, 26), rep(0, 26)) # 0s are the black cards and 1s are the red cards
+n_samples <- 10^5
+pairs <- rep(numeric(2), 26)
+number_br_pairs <- rep(0, n_samples)
+
+for (n in 1:n_samples){
+  shuffle_deck <- sample(deck)
+  pairs <- split(shuffle_deck, ceiling(seq_along(shuffle_deck) / 2))
+  for (i in 1:26){
+    number_br_pairs[n] <- number_br_pairs[n] + sum(pairs[[i]])%%2
+  }
+}
+
+mu <- mean(number_br_pairs)
+v <- var(number_br_pairs)
+
+# Chebyshev's inequality
+X_target <- 10
+k <- X_target - mu
+P_Cheb <- v/k^2
+print(paste("The bound according to Chebyshev's inequality is", signif(P_Cheb, 3)))
+
+```
+
+## Exercise 6 - Bus station 
+
+In a stationary bus at the departure station, a passenger gets on the bus, on average every 30 seconds.
+
+### Part a) Compute the probability of getting more than 6 passengers after 2 minutes. Evaluate the probability of having less than 4 passengers after 3 minutes.
+
+The passengers getting on the bus is assumed to be a Poisson process (unrelated rare events), therefore the requests above can be written as in the following. Specifically, it is assumed that $\lambda = \frac{1}{30 \ \text{s}}$.
+
+$$
+P(N(t=2 \ \text{min}) > 6) = 1 - \sum_{j=0}^{6} \frac{(\lambda t)^j e^{-\lambda t}}{j!} = 1 - \sum_{j=0}^{6} \frac{4^j e^{-4}}{j!} = 1 - e^{-4}(1 + 4 + \frac{16}{2} + \frac{64}{6} + \frac{256}{24} + \frac{1024}{120} + \frac{4096}{720}) \approx 0.111 \\
+P(N(t=3 \ \text{min}) < 4) = \sum_{j=0}^{3} \frac{(\lambda t)^j e^{-\lambda t}}{j!} = \sum_{j=0}^{3} \frac{6^j e^{-6}}{j!} = e^{-6}(1 + 6 + \frac{36}{2} + \frac{216}{6}) \approx 0.151
+$$
+
+This can also be computed in R.
+
+```{r}
+# time unit is 30 seconds
+lambda <- 1/30
+t1 <- 2*60
+
+print(paste('The probability of getting more than 6 passengers after 2 minutes is', signif(1-ppois(6,lambda*t1), 3), '.'))
+
+t2 <- 3*60
+
+print(paste('The probability of getting less than 4 passengers after 3 minutes is', signif(ppois(3,lambda*t2), 3), '.'))
+```
+
+### Part b) Simulate the distribution of the arrival time of the third passenger and superimpose the corresponding pdf.
+
+Assuming that the first two passengers have already gotten on the bus, the arrival time of the third follows the Erlang probability distribution, a Gamma distribution $Gamma(n, \lambda)$ so that the first parameter is an integer. In this case, calling $t_3$ the time of the third event ($n=3$), we get
+
+$$
+\text{pdf}(t_3) = Gamma(n=3, \lambda=\frac{1}{30})(t_3) = \frac{t_3^{n-1} \lambda^n e^{-\lambda t_3}}{(n-1)!} = \frac{t_3^2 \ e^{- \frac{t_3}{30}}}{2 \cdot 30^3}
+$$
+
+```{r}
+n <- 3
+lambda <- 1/30
+
+## sampling
+unif_samples <- runif(10^6, 0, 1)
+erlang_icdf <- function(x){
+  return(qgamma(x, n, lambda))
+}
+
+erlang_samples <- sapply(unif_samples, erlang_icdf)
+hist(erlang_samples, breaks=max(erlang_samples)/10, freq=FALSE, xlim=c(0,max(erlang_samples)), col='lightblue', xlab='Time (s)', ylab='Probability', main='Random sampling from Erlang pdf')
+
+## pdf drawing
+erlang_pdf <- function(t){
+  return(dgamma(t, n, lambda))
+}
+
+t_3 <- seq(0, 10*60, 1)
+pdf_3 <- sapply(t_3, erlang_pdf)
+lines(t_3, pdf_3, type='l', col='red3', lwd=2)
+
+## mean and variance
+erlang_mean <- mean(erlang_samples)
+abline(v=erlang_mean, lwd=1.5, lty=2, col='navy')
+text(erlang_mean+100, max(pdf_3)*0.8, paste('Sampling mean:', signif(erlang_mean, 3)), cex=0.8, col='navy')
+
+```
+
+### Part c) Repeat the procedure of the point b) for the difference in arrival time between the fifth and the first passenger.
+
+$$
+\text{pdf}(t_{5,1}) = Gamma(n=4, \lambda=\frac{1}{30})(t) = \frac{t^3 \lambda^4 e^{-\lambda t}}{3!}
+$$
+
+
+```{r}
+n <- 4
+lambda <- 1/30
+
+## sampling
+unif_samples <- runif(10^6, 0, 1)
+erlang_icdf <- function(x){
+  return(qgamma(x, n, lambda))
+}
+
+erlang_samples <- sapply(unif_samples, erlang_icdf)
+hist(erlang_samples, breaks=max(erlang_samples)/10, freq=FALSE, xlim=c(0,max(erlang_samples)), col='lightblue', xlab='Time (s)', ylab='Probability', main='Random sampling from Erlang pdf')
+
+## pdf drawing
+erlang_pdf <- function(t){
+  return(dgamma(t, n, lambda))
+}
+
+t <- seq(0, 10*60, 1)
+pdf_values <- sapply(t, erlang_pdf)
+lines(t, pdf_values, type='l', col='red3', lwd=2)
+
+## mean and variance
+erlang_mean <- mean(erlang_samples)
+abline(v=erlang_mean, lwd=1.5, lty=2, col='navy')
+text(erlang_mean+100, max(pdf_3)*0.8, paste('Sampling mean:', signif(erlang_mean, 3)), cex=0.8, col='navy')
+
+```
